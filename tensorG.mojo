@@ -360,7 +360,6 @@ struct TensorG[Type: DType]:
     fn __iterate_tensor[
         nelts: Int
     ](self, other: Self, res: Self, inout flag: Bool, func: StringLiteral):
-        let suffix_product = self.__dim_suffix_product[dims_average_size]()
         let size = self.dims.num_elements()
 
         @parameter
@@ -395,7 +394,7 @@ struct TensorG[Type: DType]:
         rt: Runtime,
         n_cores: Int,
     ):
-        let suffix_product = self.__dim_suffix_product[dims_average_size]()
+
         var last_dim = 1
         if self.dims.rank() > 1:
             last_dim = self.dims[self.dims.rank() - 1]
