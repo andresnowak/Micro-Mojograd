@@ -12,6 +12,17 @@ import math
 alias dims_average_size = 5
 
 
+fn __check_bounds(index: Int, size: Int):
+    let index_in_bounds = index >= 0 and index < size
+    debug_assert(index_in_bounds, "Error index out of bounds.")
+
+
+fn __negative_pos_to_positive(index: Int, size: Int) -> Int:
+    if index < 0:
+        return size + index
+    return index
+
+
 struct TensorView:
     var tensor_shape: Pointer[Int]
     var size: Int
@@ -62,30 +73,48 @@ struct TensorView:
             size *= self.tensor_shape[i]
         return size
 
-    @always_inline
-    fn get_position[len: Int](self, index: StaticIntTuple[len]) -> Int:
+    fn __get_position(self, get_index_value: fn (Int) capturing -> Int) -> Int:
+        """Convert position from tuple of index dimensions to 1D position."""
         var pos = 0
         var dims_product_acum = 1
         for i in range(self.rank() - 1, 0, -1):
             dims_product_acum *= self.tensor_shape[i]
-            pos += index[i - 1] * dims_product_acum
+            pos += (
+                __negative_pos_to_positive(
+                    get_index_value(i - 1), self.tensor_shape[i - 1]
+                )
+                * dims_product_acum
+            )
 
-        pos += index[self.rank() - 1]
+        pos += __negative_pos_to_positive(
+            get_index_value(self.rank() - 1), self.tensor_shape[self.rank() - 1]
+        )
         return pos
+
+    @always_inline
+    fn get_position[len: Int](self, index: StaticIntTuple[len]) -> Int:
+        """Convert position from tuple of index dimensions to 1D position."""
+
+        @parameter
+        fn get_index_value(i: Int) -> Int:
+            return index[i]
+
+        return self.__get_position(get_index_value)
 
     @always_inline
     fn get_position[len: Int](self, index: InlinedFixedVector[len, Int]) -> Int:
-        var pos = 0
-        var dims_product_acum = 1
-        for i in range(self.rank() - 1, 0, -1):
-            dims_product_acum *= self.tensor_shape[i]
-            pos += index[i - 1] * dims_product_acum
+        """Convert position from tuple of index dimensions to 1D position."""
 
-        pos += index[self.rank() - 1]
-        return pos
+        @parameter
+        fn get_index_value(i: Int) -> Int:
+            return index[i]
+
+        return self.__get_position(get_index_value)
 
     fn __getitem__(self, index: Int) -> Int:
-        return self.tensor_shape[index]
+        let pos = __negative_pos_to_positive(index, self.len)
+        __check_bounds(pos, self.len)
+        return self.tensor_shape[pos]
 
     fn __len__(self: Self) -> Int:
         """Get rank of tensor view."""
@@ -142,24 +171,27 @@ struct TensorView:
 struct TensorG[Type: DType]:
     var data: DTypePointer[Type]
     var dims: TensorView
+    var size: Int
 
     fn __init__(inout self, random: Bool, *dims: Int):
         self.dims = TensorView(dims)
-        let size = self.dims.num_elements()
+        self.size = 1
+        self.size = self.dims.num_elements()
 
-        self.data = DTypePointer[Type].alloc(size)
+        self.data = DTypePointer[Type].alloc(self.size)
         if random:
-            rand(self.data, size)
+            rand(self.data, self.size)
         else:
             self.zero()
 
     fn __init__(inout self, random: Bool, dims: TensorView):
         self.dims = dims
-        let size = self.dims.num_elements()
+        self.size = 1
+        self.size = self.dims.num_elements()
 
-        self.data = DTypePointer[Type].alloc(size)
+        self.data = DTypePointer[Type].alloc(self.size)
         if random:
-            rand(self.data, size)
+            rand(self.data, self.size)
         else:
             self.zero()
 
@@ -169,16 +201,17 @@ struct TensorG[Type: DType]:
         dims: TensorView,
     ):
         self.dims = dims
-        let size = self.dims.num_elements()
+        self.size = 1
+        self.size = self.dims.num_elements()
 
-        let dims_area_correct = size == len(data)
+        let dims_area_correct = self.size == len(data)
         debug_assert(
             dims_area_correct,
             "Error, the size of the data doesn't match the size of the tensor.",
         )
 
-        self.data = DTypePointer[Type].alloc(size)
-        for i in range(size):
+        self.data = DTypePointer[Type].alloc(self.size)
+        for i in range(self.size):
             self.data.simd_store[1](i, data[i])
 
     fn __init__(
@@ -187,16 +220,17 @@ struct TensorG[Type: DType]:
         dims: TensorView,
     ):
         self.dims = dims
-        let size = self.dims.num_elements()
+        self.size = 1
+        self.size = self.dims.num_elements()
 
-        let dims_area_correct = size == len(data)
+        let dims_area_correct = self.size == len(data)
         debug_assert(
             dims_area_correct,
             "Error, the size of the data doesn't match the size of the tensor.",
         )
 
-        self.data = DTypePointer[Type].alloc(size)
-        for i in range(size):
+        self.data = DTypePointer[Type].alloc(self.size)
+        for i in range(self.size):
             self.data.simd_store[1](i, data[i])
 
     fn __del__(owned self):
@@ -207,18 +241,20 @@ struct TensorG[Type: DType]:
 
     fn __copyinit__(inout self, existing: Self):
         self.dims = existing.dims
-        let size = self.dims.num_elements()
-        self.data = DTypePointer[Type].alloc(size)
+        self.size = 1
+        self.size = self.dims.num_elements()
+        self.data = DTypePointer[Type].alloc(self.size)
 
-        for i in range(size):
+        for i in range(self.size):
             self.data.simd_store[1](i, existing.data.simd_load[1](i))
 
     fn __moveinit__(inout self, owned existing: Self):
         self.dims = existing.dims
         self.data = existing.data
+        self.size = existing.size
 
     fn byte_count(self) -> Int:
-        return sizeof[Type]() * self.dims.num_elements()
+        return sizeof[Type]() * self.size
 
     @always_inline
     fn __getitem__[len: Int](self, index: StaticIntTuple[len]) -> SIMD[Type, 1]:
@@ -239,20 +275,24 @@ struct TensorG[Type: DType]:
     fn load[
         nelts: Int, len: Int
     ](self, index: StaticIntTuple[len]) -> SIMD[Type, nelts]:
-        return self.data.simd_load[nelts](
-            self.dims.get_position(index)
-        )  # cols = 5. so if y is 0 position and x is 1 position we acces 1 position, if position y is 1 and x is 0 we acces 5 position
+        let pos = self.dims.get_position(index)
+        __check_bounds(pos, self.size)
+        return self.data.simd_load[nelts](pos)
 
     @always_inline
     fn load[
         nelts: Int, len: Int
     ](self, index: InlinedFixedVector[len, Int]) -> SIMD[Type, nelts]:
-        return self.data.simd_load[nelts](self.dims.get_position(index))
+        let pos = self.dims.get_position(index)
+        __check_bounds(pos, self.size)
+        return self.data.simd_load[nelts](pos)
 
     @always_inline
     fn load[nelts: Int](self, index: Int) -> SIMD[Type, nelts]:
         """Access the data as a 1D array."""
-        return self.data.simd_load[nelts](index)
+        let pos = __negative_pos_to_positive(index, self.size)
+        __check_bounds(pos, self.size)
+        return self.data.simd_load[nelts](pos)
 
     @always_inline
     fn __setitem__[len: Int](self, index: StaticIntTuple[len], val: SIMD[Type, 1]):
@@ -272,18 +312,24 @@ struct TensorG[Type: DType]:
     fn store[
         nelts: Int, len: Int
     ](self, index: StaticIntTuple[len], val: SIMD[Type, nelts]):
-        self.data.simd_store[nelts](self.dims.get_position(index), val)
+        let pos = self.dims.get_position(index)
+        __check_bounds(pos, self.size)
+        self.data.simd_store[nelts](pos, val)
 
     @always_inline
     fn store[
         nelts: Int, len: Int
     ](self, index: InlinedFixedVector[len, Int], val: SIMD[Type, nelts]):
-        self.data.simd_store[nelts](self.dims.get_position(index), val)
+        let pos = self.dims.get_position(index)
+        __check_bounds(pos, self.size)
+        self.data.simd_store[nelts](pos, val)
 
     @always_inline
     fn store[nelts: Int](self, index: Int, val: SIMD[Type, nelts]):
         """Access and store the data as a 1D array."""
-        self.data.simd_store[nelts](index, val)
+        let pos = __negative_pos_to_positive(index, self.size)
+        __check_bounds(pos, self.size)
+        self.data.simd_store[nelts](pos, val)
 
     fn __dim_suffix_product[len: Int](self) -> InlinedFixedVector[len, Int]:
         var suffix_product = InlinedFixedVector[len, Int](self.dims.rank())
@@ -335,7 +381,6 @@ struct TensorG[Type: DType]:
 
             if i > 0 and i < size:
                 print_no_newline(",")
-
             if i < size:
                 for i in range(count):
                     print()
