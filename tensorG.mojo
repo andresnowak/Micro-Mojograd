@@ -296,22 +296,6 @@ struct TensorG[Type: DType]:
 
         return suffix_product
 
-    fn __dim_matmul_suffix_product[
-        len: Int
-    ](self, other: Self) -> InlinedFixedVector[len, Int]:
-        var suffix_product = InlinedFixedVector[len, Int](self.dims.rank() + 1)
-        suffix_product.append(1)  # the first value has to be 1
-
-        suffix_product.append(suffix_product[0] * other.dims[other.dims.rank() - 1])
-        suffix_product.append(suffix_product[1] * self.dims[self.dims.rank() - 1])
-
-        for index in range(self.dims.rank() - 2):
-            suffix_product.append(
-                suffix_product[index + 2] * self.dims[self.dims.rank() - 2 - index]
-            )
-
-        return suffix_product
-
     fn __matmul_num_elements(self, other: Self) -> Int:
         var size = 1
         for i in range(self.dims.rank() - 2):
@@ -330,36 +314,40 @@ struct TensorG[Type: DType]:
         return size
 
     fn print_all(self):
-        let suffix_product = self.__dim_suffix_product[dims_average_size]()
-
-        # the first dimension uses the last value of the suffix_product,and the last dimension uses the first value of the suffix_product (so 1)
-
-        print("[")
-
-        var index_values_old = InlinedFixedVector[dims_average_size, Int](
-            self.dims.rank()
-        )
         let size = self.dims.num_elements()
 
-        for i in range(size):
-            var index_values = InlinedFixedVector[dims_average_size, Int](
-                self.dims.rank()
+        var suffix_product = InlinedFixedVector[dims_average_size, Int](
+            self.dims.rank() + 1
+        )
+        suffix_product.append(1)
+        for index in range(self.dims.rank()):
+            suffix_product.append(
+                suffix_product[index] * self.dims[self.dims.rank() - 1 - index]
             )
+
+        var count = 0
+        for i in range(size + 1):
+            count = 0
             for j in range(self.dims.rank()):
-                let index = i // suffix_product[self.dims.rank() - 1 - j] % self.dims[j]
+                if i % suffix_product[j + 1] == 0 and i != 0:
+                    print_no_newline("]")
+                    count += 1
 
-                index_values.append(index)
+            if i > 0 and i < size:
+                print_no_newline(",")
 
-            for i in range(self.dims.rank() - 1):
-                if index_values[i] > index_values_old[i]:
-                    print("],\n[")
-                    break
+            if i < size:
+                for i in range(count):
+                    print()
 
-            print_no_newline(self[index_values], ",")
+            for j in range(self.dims.rank()):
+                if i % suffix_product[j + 1] == 0 and i != size:
+                    print_no_newline("[")
 
-            index_values_old = index_values
+            if i < size:
+                print_no_newline(self[i])
 
-        print("]")
+        print()
 
     fn rank(self) -> Int:
         return self.dims.rank()
@@ -519,7 +507,6 @@ struct TensorG[Type: DType]:
         debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
 
         let res = Self(False, 1)
-
         let size = self.dims.num_elements()
 
         @parameter
@@ -605,18 +592,14 @@ struct TensorG[Type: DType]:
         res_dims.append(other.dims[other.dims.rank() - 1])
 
         let res = Self(False, TensorView(res_dims))
-
         let size = self.__matmul_num_elements(other)
 
-        let res_last_dim = res.dims[
-            res.dims.rank() - 1
-        ]  # The dimension that is different for self and other (self dim)
-        let self_last_dim = self.dims[
-            self.dims.rank() - 1
-        ]  # the dimension that is the same for self and other
-        let res_penult_dim = res.dims[
-            res.dims.rank() - 2
-        ]  # The other dimension that is different for self and other (other dim)
+        # The dimension that is different for self and other (self dim)
+        let res_last_dim = res.dims[res.dims.rank() - 1]
+        # the dimension that is the same for self and other
+        let self_last_dim = self.dims[self.dims.rank() - 1]
+        # The other dimension that is different for self and other (other dim)
+        let res_penult_dim = res.dims[res.dims.rank() - 2]
 
         # We use the for inside the parallel function to remove data races, so the vectorize function works in the last dimension of the res tensor and the for makes it so the for and vectorize function work on the penultimate dimension of the res tensor (so parallel works on the penultimate dimension of the res tensor)
         @parameter
