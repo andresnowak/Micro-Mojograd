@@ -2,6 +2,7 @@ from time import now
 from tensorG import TensorG, TensorView
 from benchmark import Benchmark
 from runtime.llcl import num_cores, Runtime
+from time import time
 
 alias simd_size_float = simdwidthof[DType.float32]()
 alias mul_pool = 4
@@ -33,15 +34,17 @@ fn benchmark_sum(dims: TensorView):
     fn bench():
         _ = matrix_1 + matrix_2
 
-    let normal = Benchmark().run[bench]() / 1e6
-    print("normal:", normal, "ms")
+    let normal = Benchmark().run[bench]()
+    print("normal:", normal / 1e6, "ms")
+    print("normal:", normal, "ns")
 
     @parameter
     fn bench_vectorized():
         _ = matrix_1.add[simd_size_float](matrix_2)
 
-    let vectorized = Benchmark().run[bench_vectorized]() / 1e6
-    print("vectorized:", vectorized, "ms")
+    let vectorized = Benchmark().run[bench_vectorized]()
+    print("vectorized:", vectorized / 1e6, "ms")
+    print("vectorized:", vectorized, "ns")
 
     with Runtime(num_cores()) as rt:
 
@@ -52,10 +55,11 @@ fn benchmark_sum(dims: TensorView):
                 matrix_2, rt, mul_pool * rt.parallelism_level()
             )
 
-        let parallelized = Benchmark().run[bench_parallel]() / 1e6
+        let parallelized = Benchmark().run[bench_parallel]()
         # Prevent the tensors from being freed before the benchmark run
         _ = (matrix_1, matrix_2)
-        print("Parallelized:", parallelized, "ms")
+        print("Parallelized:", parallelized / 1e6, "ms")
+        print("Parallelized:", parallelized, "ns")
 
 
 fn benchmark_mul(dims: TensorView):
@@ -66,15 +70,17 @@ fn benchmark_mul(dims: TensorView):
     fn bench():
         _ = matrix_1 * matrix_2
 
-    let normal = Benchmark().run[bench]() / 1e6
-    print("normal:", normal, "ms")
+    let normal = Benchmark().run[bench]()
+    print("normal:", normal / 1e6, "ms")
+    print("normal:", normal, "ns")
 
     @parameter
     fn bench_vectorized():
         _ = matrix_1.mul[simd_size_float](matrix_2)
 
-    let vectorized = Benchmark().run[bench_vectorized]() / 1e6
-    print("vectorized:", vectorized, "ms")
+    let vectorized = Benchmark().run[bench_vectorized]()
+    print("vectorized:", vectorized / 1e6, "ms")
+    print("vectorized:", vectorized, "ns")
 
     with Runtime(num_cores()) as rt:
 
@@ -85,10 +91,11 @@ fn benchmark_mul(dims: TensorView):
                 matrix_2, rt, mul_pool * rt.parallelism_level()
             )
 
-        let parallelized = Benchmark().run[bench_parallel]() / 1e6
+        let parallelized = Benchmark().run[bench_parallel]()
         # Prevent the tensors from being freed before the benchmark run
         _ = (matrix_1, matrix_2)
-        print("Parallelized:", parallelized, "ms")
+        print("Parallelized:", parallelized / 1e6, "ms")
+        print("Parallelized:", parallelized, "ns")
 
 
 fn benchmark_matmul(dims: TensorView):
@@ -125,9 +132,13 @@ fn benchmark_matmul(dims: TensorView):
 
 
 fn main():
+    let start = time.now()
     print("Benchmarking sum")
     benchmark_sum(TensorView(512, 512, 512))
     print("Benchmarking mul")
     benchmark_mul(TensorView(512, 512, 512))
     print("Benchmarking matmul")
     benchmark_matmul(TensorView(512, 512))
+    let end = time.now()
+
+    print("Elapsed time:", (end - start) // 1_000_000, "ms")
