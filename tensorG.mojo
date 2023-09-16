@@ -365,43 +365,34 @@ struct TensorG[Type: DType]:
         return self.dims.rank()
 
     @always_inline
-    fn __iterate_tensor[
-        nelts: Int
-    ](self, other: Self, res: Self, inout flag: Bool, func: StringLiteral):
+    fn __add__(self, other: Self) -> Self:
+        return self.add[1](other)
+
+    @always_inline
+    fn add[nelts: Int](self, other: Self) -> Self:
+        let dims_eq = self.dims == other.dims
+        debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
+
+        let res = Self(False, self.dims)
         let size = self.dims.num_elements()
 
         @parameter
         fn iterate_vectorize[nelts: Int](i: Int):
-            if func == "add":
-                res.store[nelts](
-                    i,
-                    self.load[nelts](i) + other.load[nelts](i),
-                )
-            elif func == "mul":
-                res.store[nelts](
-                    i,
-                    self.load[nelts](i) * other.load[nelts](i),
-                )
-            elif func == "eq":
-                if self.load[nelts](i) != other.load[nelts](i):
-                    flag = False
-            else:
-                debug_assert(False, "Error, function not implemented.")
+            res.store[nelts](
+                i,
+                self.load[nelts](i) + other.load[nelts](i),
+            )
 
         vectorize[nelts, iterate_vectorize](size)
 
+        return res ^
+
     @always_inline
-    fn __iterate_tensor[
-        nelts: Int
-    ](
-        self,
-        other: Self,
-        res: Self,
-        inout flag: Bool,
-        func: StringLiteral,
-        rt: Runtime,
-        n_cores: Int,
-    ):
+    fn add[nelts: Int](self, other: Self, rt: Runtime, n_cores: Int) -> Self:
+        let dims_eq = self.dims == other.dims
+        debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
+
+        let res = Self(False, self.dims)
         let size = self.dims.num_elements()
 
         let first_dim = self.dims[0]
@@ -413,58 +404,14 @@ struct TensorG[Type: DType]:
             fn iterate_vectorize[nelts: Int](j: Int):
                 let index = i * dims_rest + j
 
-                if func == "add":
-                    res.store[nelts](
-                        index,
-                        self.load[nelts](index) + other.load[nelts](index),
-                    )
-                elif func == "mul":
-                    res.store[nelts](
-                        index,
-                        self.load[nelts](index) * other.load[nelts](index),
-                    )
-                elif func == "eq":
-                    if self.load[nelts](index) != other.load[nelts](index):
-                        flag = False
-                else:
-                    debug_assert(False, "Error, function not implemented.")
+                res.store[nelts](
+                    index,
+                    self.load[nelts](index) + other.load[nelts](index),
+                )
 
             vectorize[nelts, iterate_vectorize](dims_rest)
 
         parallelize[iterate_parallel](rt, first_dim, n_cores)
-
-    @always_inline
-    fn __add__(self, other: Self) -> Self:
-        return self.add[1](other)
-
-    @always_inline
-    fn add[nelts: Int](self, other: Self) -> Self:
-        let dims_eq = self.dims == other.dims
-        debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
-
-        let res = Self(False, self.dims)
-
-        @parameter
-        fn add_v(index_values: InlinedFixedVector[dims_average_size, Int]):
-            res.store[nelts](
-                index_values,
-                self.load[nelts](index_values) + other.load[nelts](index_values),
-            )
-
-        var flag = True
-        self.__iterate_tensor[nelts](other, res, flag, "add")
-
-        return res ^
-
-    @always_inline
-    fn add[nelts: Int](self, other: Self, rt: Runtime, n_cores: Int) -> Self:
-        let dims_eq = self.dims == other.dims
-        debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
-
-        let res = Self(False, self.dims)
-
-        var flag = True
-        self.__iterate_tensor[nelts](other, res, flag, "add", rt, n_cores)
 
         return res ^
 
@@ -477,9 +424,16 @@ struct TensorG[Type: DType]:
         debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
 
         let res = Self(False, self.dims)
+        let size = self.dims.num_elements()
 
-        var flag = True
-        self.__iterate_tensor[nelts](other, res, flag, "mul")
+        @parameter
+        fn iterate_vectorize[nelts: Int](i: Int):
+            res.store[nelts](
+                i,
+                self.load[nelts](i) * other.load[nelts](i),
+            )
+
+        vectorize[nelts, iterate_vectorize](size)
 
         return res ^
 
@@ -489,9 +443,24 @@ struct TensorG[Type: DType]:
         debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
 
         let res = Self(False, self.dims)
+        let size = self.dims.num_elements()
 
-        var flag = True
-        self.__iterate_tensor[nelts](other, res, flag, "mul", rt, n_cores)
+        let first_dim = self.dims[0]
+        let dims_rest = size // first_dim  # the rest of the dimensions
+
+        @parameter
+        fn iterate_parallel(i: Int):
+            @parameter
+            fn iterate_vectorize[nelts: Int](j: Int):
+                let index = i * dims_rest + j
+                res.store[nelts](
+                    index,
+                    self.load[nelts](index) * other.load[nelts](index),
+                )
+
+            vectorize[nelts, iterate_vectorize](dims_rest)
+
+        parallelize[iterate_parallel](rt, first_dim, n_cores)
 
         return res ^
 
@@ -504,10 +473,15 @@ struct TensorG[Type: DType]:
         let dims_eq = self.dims == other.dims
         debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
 
-        let res = Self(False, 0)
         var flag = True
+        let size = self.dims.num_elements()
 
-        self.__iterate_tensor[nelts](other, res, flag, "eq")
+        @parameter
+        fn iterate_vectorize[nelts: Int](i: Int):
+            if self.load[nelts](i) != other.load[nelts](i):
+                flag = False
+
+        vectorize[nelts, iterate_vectorize](size)
 
         return flag
 
@@ -516,10 +490,24 @@ struct TensorG[Type: DType]:
         let dims_eq = self.dims == other.dims
         debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
 
-        let res = Self(False, 0)
         var flag = True
+        let size = self.dims.num_elements()
 
-        self.__iterate_tensor[nelts](other, res, flag, "eq", rt, n_cores)
+        let first_dim = self.dims[0]
+        let dims_rest = size // first_dim  # the rest of the dimensions
+
+        @parameter
+        fn iterate_parallel(i: Int):
+            @parameter
+            fn iterate_vectorize[nelts: Int](j: Int):
+                let index = i * dims_rest + j
+
+                if self.load[nelts](index) != other.load[nelts](index):
+                    flag = False
+
+            vectorize[nelts, iterate_vectorize](dims_rest)
+
+        parallelize[iterate_parallel](rt, first_dim, n_cores)
 
         return flag
 
