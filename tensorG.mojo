@@ -402,36 +402,36 @@ struct TensorG[Type: DType]:
         rt: Runtime,
         n_cores: Int,
     ):
-        var last_dim = 1
-        if self.dims.rank() > 1:
-            last_dim = self.dims[self.dims.rank() - 1]
         let size = self.dims.num_elements()
 
+        let first_dim = self.dims[0]
+        let dims_rest = size // first_dim  # the rest of the dimensions
+
         @parameter
-        fn iterate_parallel(n: Int):
+        fn iterate_parallel(i: Int):
             @parameter
-            fn iterate_vectorize[nelts: Int](k: Int):
-                let i = n * last_dim + k
+            fn iterate_vectorize[nelts: Int](j: Int):
+                let index = i * dims_rest + j
 
                 if func == "add":
                     res.store[nelts](
-                        i,
-                        self.load[nelts](i) + other.load[nelts](i),
+                        index,
+                        self.load[nelts](index) + other.load[nelts](index),
                     )
                 elif func == "mul":
                     res.store[nelts](
-                        i,
-                        self.load[nelts](i) * other.load[nelts](i),
+                        index,
+                        self.load[nelts](index) * other.load[nelts](index),
                     )
                 elif func == "eq":
-                    if self.load[nelts](i) != other.load[nelts](i):
+                    if self.load[nelts](index) != other.load[nelts](index):
                         flag = False
                 else:
                     debug_assert(False, "Error, function not implemented.")
 
-            vectorize[nelts, iterate_vectorize](last_dim)
+            vectorize[nelts, iterate_vectorize](dims_rest)
 
-        parallelize[iterate_parallel](rt, size // last_dim, n_cores)
+        parallelize[iterate_parallel](rt, first_dim, n_cores)
 
     @always_inline
     fn __add__(self, other: Self) -> Self:
