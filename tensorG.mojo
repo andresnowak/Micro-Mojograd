@@ -18,7 +18,9 @@ struct TensorView:
     var len: Int
 
     fn __init__(inout self, *dims: Int):
-        let temp = VariadicList(dims) # because i dont know how to get the size with the variadic MLIR
+        let temp = VariadicList(
+            dims
+        )  # because i dont know how to get the size with the variadic MLIR
         self.tensor_shape = Pointer[Int].alloc(len(temp))
         for i in range(len(temp)):
             self.tensor_shape.store(i, temp[i])
@@ -315,9 +317,15 @@ struct TensorG[Type: DType]:
         for i in range(self.dims.rank() - 2):
             size *= self.dims[i]
 
-        size *= self.dims[self.dims.rank() - 2] # The different dimension of first tensor
-        size *= other.dims[other.dims.rank() - 1] # the different dimension of second tensor
-        size *= self.dims[self.dims.rank() - 1] # The dimension that is the same for both tensors
+        size *= self.dims[
+            self.dims.rank() - 2
+        ]  # The different dimension of first tensor
+        size *= other.dims[
+            other.dims.rank() - 1
+        ]  # the different dimension of second tensor
+        size *= self.dims[
+            self.dims.rank() - 1
+        ]  # The dimension that is the same for both tensors
 
         return size
 
@@ -394,7 +402,6 @@ struct TensorG[Type: DType]:
         rt: Runtime,
         n_cores: Int,
     ):
-
         var last_dim = 1
         if self.dims.rank() > 1:
             last_dim = self.dims[self.dims.rank() - 1]
@@ -409,14 +416,12 @@ struct TensorG[Type: DType]:
                 if func == "add":
                     res.store[nelts](
                         i,
-                        self.load[nelts](i)
-                        + other.load[nelts](i),
+                        self.load[nelts](i) + other.load[nelts](i),
                     )
                 elif func == "mul":
                     res.store[nelts](
                         i,
-                        self.load[nelts](i)
-                        * other.load[nelts](i),
+                        self.load[nelts](i) * other.load[nelts](i),
                     )
                 elif func == "eq":
                     if self.load[nelts](i) != other.load[nelts](i):
@@ -531,7 +536,13 @@ struct TensorG[Type: DType]:
 
         @parameter
         fn dot_v[nelts: Int](index: Int):
-            res[0] = res[0] + (self.data.simd_load[nelts](index) * other.data.simd_load[nelts](index)).reduce_add()
+            res[0] = (
+                res[0]
+                + (
+                    self.data.simd_load[nelts](index)
+                    * other.data.simd_load[nelts](index)
+                ).reduce_add()
+            )
 
         vectorize[nelts, dot_v](size)
 
@@ -556,74 +567,39 @@ struct TensorG[Type: DType]:
         res_dims.append(other.dims[other.dims.rank() - 1])
 
         let res = Self(False, TensorView(res_dims))
-        var flag = True
-
-        let matmul_suffix_product = self.__dim_matmul_suffix_product[dims_average_size](
-            other
-        )
 
         let size = self.__matmul_num_elements(other)
 
+        let res_last_dim = res.dims[
+            res.dims.rank() - 1
+        ]  # The dimension that is different for self and other (other dim)
+        let self_last_dim = self.dims[
+            self.dims.rank() - 1
+        ]  # the dimension that is the same for self and other
+        let res_penult_dim = res.dims[
+            res.dims.rank() - 2
+        ]  # The other dimension that is different for self and other (self dim)
+
         # we use a for, so only vectorize works in the las dimension (the dimension were the values are stored), because if not vectorized can grab position that area outside of the memory of our data (because size is bigger than the size of the tensor)
-        let res_last_dim = res.dims[res.dims.rank() - 1]
-        for i in range(0, size // res_last_dim):    
-            @parameter
-            fn matmul_v[nelts: Int](j: Int):
-                let index = i * res_last_dim + j
 
-                var index_values_self = InlinedFixedVector[dims_average_size, Int](
-                    self.dims.rank()
-                )
-                var index_values_other = InlinedFixedVector[dims_average_size, Int](
-                    self.dims.rank()
-                )
-                var index_values_res = InlinedFixedVector[dims_average_size, Int](
-                    self.dims.rank()
-                )
+        for i in range(0, size // (res_last_dim * self_last_dim)):
+            for j in range(0, self_last_dim):
 
-                for i in range(self.dims.rank() - 2):
-                    let index_pos = index
-                        // matmul_suffix_product[self.dims.rank() - i]
-                        % self.dims[i]
-                    index_values_self.append(
-                        index_pos
+                @parameter
+                fn matmul_v[nelts: Int](k: Int):
+                    let index_res = i * res_last_dim + k
+                    let index_self = i * self_last_dim + j
+                    let index_other = (
+                        i // res_penult_dim
+                    ) * self_last_dim * res_last_dim + j * res_last_dim + k
+
+                    res.store[nelts](
+                        index_res,
+                        res.load[nelts](index_res)
+                        + self.load[1](index_self) * other.load[nelts](index_other),
                     )
-                    index_values_other.append(
-                        index_pos
-                    )
-                    index_values_res.append(
-                        index_pos
-                    )
-                
-                index_values_self.append(
-                    index // matmul_suffix_product[2] % self.dims[self.dims.rank() - 2]
-                )
-                index_values_self.append(
-                    index // matmul_suffix_product[1] % self.dims[self.dims.rank() - 1]
-                )
 
-                index_values_other.append(
-                    index // matmul_suffix_product[1] % other.dims[other.dims.rank() - 2]
-                )
-                index_values_other.append(
-                    index // matmul_suffix_product[0] % other.dims[other.dims.rank() - 1]
-                )
-
-                index_values_res.append(
-                    (index // matmul_suffix_product[2]) % res.dims[res.dims.rank() - 2]
-                )
-                index_values_res.append(
-                    (index // matmul_suffix_product[0]) % res.dims[res.dims.rank() - 1]
-                )
-
-                res.store[nelts](
-                    index_values_res,
-                    res.load[nelts](index_values_res)
-                    + self.load[1](index_values_self)
-                    * other.load[nelts](index_values_other),
-                )
-
-            vectorize[nelts, matmul_v](res_last_dim)
+                vectorize[nelts, matmul_v](res_last_dim)
 
         return res ^
 
@@ -642,75 +618,36 @@ struct TensorG[Type: DType]:
         res_dims.append(other.dims[other.dims.rank() - 1])
 
         let res = Self(False, TensorView(res_dims))
-        var flag = True
-
-        let matmul_suffix_product = self.__dim_matmul_suffix_product[dims_average_size](
-            other
-        )
 
         let size = self.__matmul_num_elements(other)
 
-        let res_last_dim = res.dims[res.dims.rank() - 1] # The dimension that is different for self and other
-        let self_last_dim = self.dims[self.dims.rank() - 1] # the dimension that is the same for self and other
+        let res_last_dim = res.dims[
+            res.dims.rank() - 1
+        ]  # The dimension that is different for self and other (self dim)
+        let self_last_dim = self.dims[
+            self.dims.rank() - 1
+        ]  # the dimension that is the same for self and other
+        let res_penult_dim = res.dims[
+            res.dims.rank() - 2
+        ]  # The other dimension that is different for self and other (other dim)
 
         # We use the for inside the parallel function to remove data races, so the vectorize function works in the last dimension of the res tensor and the for makes it so the for and vectorize function work on the penultimate dimension of the res tensor (so parallel works on the penultimate dimension of the res tensor)
         @parameter
         fn matmul_p(i: Int):
             for j in range(0, self_last_dim):
+
                 @parameter
                 fn matmul_v[nelts: Int](k: Int):
-                    let index = i * (res_last_dim * self_last_dim) + j * res_last_dim + k # remove data races of parallel
-
-                    var index_values_self = InlinedFixedVector[dims_average_size, Int](
-                    self.dims.rank()
-                    )
-                    var index_values_other = InlinedFixedVector[dims_average_size, Int](
-                        self.dims.rank()
-                    )
-                    var index_values_res = InlinedFixedVector[dims_average_size, Int](
-                        self.dims.rank()
-                    )
-
-                    for i in range(self.dims.rank() - 2):
-                        let index_pos = index
-                            // matmul_suffix_product[self.dims.rank() - i]
-                            % self.dims[i]
-                        index_values_self.append(
-                            index_pos
-                        )
-                        index_values_other.append(
-                            index_pos
-                        )
-                        index_values_res.append(
-                            index_pos
-                        )
-                    
-                    index_values_self.append(
-                        index // matmul_suffix_product[2] % self.dims[self.dims.rank() - 2]
-                    )
-                    index_values_self.append(
-                        index // matmul_suffix_product[1] % self.dims[self.dims.rank() - 1]
-                    )
-
-                    index_values_other.append(
-                        index // matmul_suffix_product[1] % other.dims[other.dims.rank() - 2]
-                    )
-                    index_values_other.append(
-                        index // matmul_suffix_product[0] % other.dims[other.dims.rank() - 1]
-                    )
-
-                    index_values_res.append(
-                        (index // matmul_suffix_product[2]) % res.dims[res.dims.rank() - 2]
-                    )
-                    index_values_res.append(
-                        (index // matmul_suffix_product[0]) % res.dims[res.dims.rank() - 1]
-                    )
+                    let index_res = i * res_last_dim + k  # remove data races of parallel
+                    let index_self = i * self_last_dim + j
+                    let index_other = (
+                        i // res_penult_dim
+                    ) * self_last_dim * res_last_dim + j * res_last_dim + k
 
                     res.store[nelts](
-                        index_values_res,
-                        res.load[nelts](index_values_res)
-                        + self.load[1](index_values_self)
-                        * other.load[nelts](index_values_other),
+                        index_res,
+                        res.load[nelts](index_res)
+                        + self.load[1](index_self) * other.load[nelts](index_other),
                     )
 
                 vectorize[nelts, matmul_v](res_last_dim)
