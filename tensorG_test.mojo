@@ -154,9 +154,10 @@ fn create_tensor_from_numpy[
     return TensorG[Type](res, shape)
 
 
-fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView):
+fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView) -> Bool:
     from python import Python
 
+    var flag = True
     try:
         let np = Python.import_module("numpy")
 
@@ -187,7 +188,9 @@ fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView):
         res = res.reshape(tensor_shape.num_elements())
         var C = create_tensor_from_numpy[type_f](res, tensor_shape)
 
-        print("Add test ", I, ":", test_add[type_f, nelts](A, B, C))
+        var res_correct = test_add[type_f, nelts](A, B, C)
+        flag = res_correct and flag
+        print("Add test ", I, ":", res_correct)
         print()
 
         # Mul Test
@@ -196,7 +199,9 @@ fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView):
         res = res.reshape(tensor_shape.num_elements())
         C = create_tensor_from_numpy[type_f](res, tensor_shape)
 
-        print("Mul test ", I, ":", test_mul[type_f, nelts](A, B, C))
+        res_correct = test_mul[type_f, nelts](A, B, C)
+        flag = res_correct and flag
+        print("Mul test ", I, ":", res_correct)
         print()
 
         # Matmul test
@@ -208,11 +213,15 @@ fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView):
         else:
             C = create_tensor_from_numpy[type_f](res, TensorView(1))
 
-        print("Matmul test ", I, ":", test_matmul[type_f, nelts](A, B, C))
+        res_correct = test_matmul[type_f, nelts](A, B, C)
+        flag = res_correct and flag
+        print("Matmul test ", I, ":", res_correct)
         print()
     except:
-        print("Error importing numpy 1")
-        return
+        print("Error importing numpy ", I)
+        return False
+
+    return flag
 
 
 fn test_different_dim(
@@ -222,9 +231,10 @@ fn test_different_dim(
     tensor_shape_1: TensorView,
     tensor_shape_2: TensorView,
     tensor_shape_3: TensorView,
-):
+) -> Bool:
     from python import Python
 
+    var flag = True
     try:
         let np = Python.import_module("numpy")
 
@@ -243,46 +253,67 @@ fn test_different_dim(
         res = res.reshape((tensor_shape_3.num_elements()))
         let C = create_tensor_from_numpy[type_f](res, tensor_shape_3)
 
-        print("Matmul test ", I, ":", test_matmul[type_f, nelts](A, B, C))
+        let res_correct = test_matmul[type_f, nelts](A, B, C)
+        flag = res_correct and flag
+        print("Matmul test ", I, ":", res_correct)
         print()
     except:
         print("Error importing numpy 2")
-        return
+        return False
+
+    return flag
 
 
 fn main():
     print("nelts size:", nelts)
 
+    var flag = True
     let start = time.now()
 
     var tensor_shape = TensorView(5, 5, 5, 5, 5, 5)
     let np_shape = (5, 5, 5, 5, 5, 5)
-    test_same_dim(1, np_shape, tensor_shape)
+    flag = test_same_dim(1, np_shape, tensor_shape) and flag
     tensor_shape = TensorView(25, 25, 25)
     let np_shape_2 = (25, 25, 25)
-    test_same_dim(2, np_shape_2, tensor_shape)
+    flag = test_same_dim(2, np_shape_2, tensor_shape) and flag
     tensor_shape = TensorView(125, 125)
     let np_shape_3 = (125, 125)
-    test_same_dim(3, np_shape_3, tensor_shape)
+    flag = test_same_dim(3, np_shape_3, tensor_shape) and flag
     tensor_shape = TensorView(15_625)
     let np_shape_4 = (15_625)
-    test_same_dim(4, np_shape_4, tensor_shape)
+    flag = test_same_dim(4, np_shape_4, tensor_shape) and flag
 
     var tensor_shape_1 = TensorView(2, 2, 3)
     var tensor_shape_2 = TensorView(2, 3, 2)
     var tensor_shape_3 = TensorView(2, 2, 2)
     let np_shape_1_1 = (2, 2, 3)
     let np_shape_1_2 = (2, 3, 2)
-    test_different_dim(
-        5, np_shape_1_1, np_shape_1_2, tensor_shape_1, tensor_shape_2, tensor_shape_3
+    flag = (
+        test_different_dim(
+            5,
+            np_shape_1_1,
+            np_shape_1_2,
+            tensor_shape_1,
+            tensor_shape_2,
+            tensor_shape_3,
+        )
+        and flag
     )
     tensor_shape_1 = TensorView(2, 4, 3)
     tensor_shape_2 = TensorView(2, 3, 5)
     tensor_shape_3 = TensorView(2, 4, 5)
     let np_shape_2_1 = (2, 4, 3)
     let np_shape_2_2 = (2, 3, 5)
-    test_different_dim(
-        6, np_shape_2_1, np_shape_2_2, tensor_shape_1, tensor_shape_2, tensor_shape_3
+    flag = (
+        test_different_dim(
+            6,
+            np_shape_2_1,
+            np_shape_2_2,
+            tensor_shape_1,
+            tensor_shape_2,
+            tensor_shape_3,
+        )
+        and flag
     )
 
     tensor_shape_1 = TensorView(5, 2, 4, 3)
@@ -290,10 +321,19 @@ fn main():
     tensor_shape_3 = TensorView(5, 2, 4, 5)
     let np_shape_3_1 = (5, 2, 4, 3)
     let np_shape_3_2 = (5, 2, 3, 5)
-    test_different_dim(
-        7, np_shape_3_1, np_shape_3_2, tensor_shape_1, tensor_shape_2, tensor_shape_3
+    flag = (
+        test_different_dim(
+            7,
+            np_shape_3_1,
+            np_shape_3_2,
+            tensor_shape_1,
+            tensor_shape_2,
+            tensor_shape_3,
+        )
+        and flag
     )
 
     let end = time.now()
 
+    print("All tests passed:", flag)
     print("Time elapsed: ", (end - start) // 1000000, "ms")
