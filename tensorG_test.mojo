@@ -1,6 +1,7 @@
 from tensorG import TensorG, TensorView
 from python import Python, PythonObject
 from runtime.llcl import num_cores, Runtime
+from time import time
 
 alias nelts = simdwidthof[DType.float64]()
 alias type_f = DType.float64
@@ -252,6 +253,8 @@ fn test_different_dim(
 fn main():
     print("nelts size:", nelts)
 
+    let start = time.now()
+
     var tensor_shape = TensorView(5, 5, 5, 5, 5, 5)
     let np_shape = (5, 5, 5, 5, 5, 5)
     test_same_dim(1, np_shape, tensor_shape)
@@ -290,3 +293,7 @@ fn main():
     test_different_dim(
         7, np_shape_3_1, np_shape_3_2, tensor_shape_1, tensor_shape_2, tensor_shape_3
     )
+
+    let end = time.now()
+
+    print("Time elapsed: ", (end - start) // 1000000, "ms")

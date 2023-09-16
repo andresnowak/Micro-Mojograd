@@ -580,8 +580,7 @@ struct TensorG[Type: DType]:
             res.dims.rank() - 2
         ]  # The other dimension that is different for self and other (self dim)
 
-        # we use a for, so only vectorize works in the las dimension (the dimension were the values are stored), because if not vectorized can grab position that area outside of the memory of our data (because size is bigger than the size of the tensor)
-
+        # we use a for, so only vectorize works in the last dimension (the dimension were the values are stored), because if not vectorized can grab a position that is outsize the area of the memory of our data (because size is bigger than the size of the tensor)
         for i in range(0, size // (res_last_dim * self_last_dim)):
             for j in range(0, self_last_dim):
 
