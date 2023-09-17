@@ -67,8 +67,8 @@ struct TensorView:
         self.size = existing.size
         self.len = existing.len
 
-    fn __del__(owned self):
-        self.tensor_shape.free()
+    # fn __del__(owned self):
+    #     self.tensor_shape.free()
 
     fn product_dimensions(self) -> Int:
         var size = 1
