@@ -182,6 +182,7 @@ struct TensorG[Type: DType]:
         self.size = 1
         self.size = self.dims.num_elements()
 
+        # check if using alligend alloc could be better
         self.data = DTypePointer[Type].alloc(self.size)
         if random:
             rand(self.data, self.size)
