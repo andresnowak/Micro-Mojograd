@@ -579,77 +579,28 @@ struct TensorG[Type: DType]:
     @always_inline
     fn matmul[nelts: Int](self, other: Self) -> Self:
         @parameter
-        fn wrapper(
-            res: Self,
-            res_last_dim: Int,
-            self_last_dim: Int,
-            res_penult_dim: Int,
-            size: Int,
-        ):
-            # we use a for, so only vectorize works in the last dimension (the dimension were the values are stored), because if not vectorized can grab a position that is outsize the area of the memory of our data (because size is bigger than the size of the tensor)
-            for i in range(0, size // (res_last_dim * self_last_dim)):
-                for j in range(0, self_last_dim):
+        fn matmul_v[outer_loop: fn (Int) capturing -> None](range_size: Int):
+            for i in range(range_size):
+                outer_loop(i)
 
-                    @parameter
-                    fn matmul_v[nelts: Int](k: Int):
-                        let index_res = i * res_last_dim + k
-                        let index_self = i * self_last_dim + j
-                        let index_other = (
-                            i // res_penult_dim
-                        ) * self_last_dim * res_last_dim + j * res_last_dim + k
-
-                        res.store[nelts](
-                            index_res,
-                            res.load[nelts](index_res)
-                            + self.load[1](index_self) * other.load[nelts](index_other),
-                        )
-
-                    vectorize[nelts, matmul_v](res_last_dim)
-
-        let res = self.__matmul[nelts](other, wrapper)
+        let res = self.__matmul[nelts, matmul_v](other)
 
         return res ^
 
     @always_inline
     fn matmul[nelts: Int](self, other: Self, rt: Runtime, n_cores: Int) -> Self:
         @parameter
-        fn wrapper(
-            res: Self,
-            res_last_dim: Int,
-            self_last_dim: Int,
-            res_penult_dim: Int,
-            size: Int,
-        ):
-            # We use the for inside the parallel function to remove data races, so the vectorize function works in the last dimension of the res tensor and the for makes it so the for and vectorize function work on the penultimate dimension of the res tensor (so parallel works on the penultimate dimension of the res tensor)
-            @parameter
-            fn matmul_p(i: Int):
-                for j in range(0, self_last_dim):
+        fn matmul_p[outer_loop: fn (Int) capturing -> None](range_size: Int):
+            parallelize[outer_loop](rt, range_size, n_cores)
 
-                    @parameter
-                    fn matmul_v[nelts: Int](k: Int):
-                        let index_res = i * res_last_dim + k  # remove data races of parallel
-                        let index_self = i * self_last_dim + j
-                        let index_other = (
-                            i // res_penult_dim
-                        ) * self_last_dim * res_last_dim + j * res_last_dim + k
-
-                        res.store[nelts](
-                            index_res,
-                            res.load[nelts](index_res)
-                            + self.load[1](index_self) * other.load[nelts](index_other),
-                        )
-
-                    vectorize[nelts, matmul_v](res_last_dim)
-
-            parallelize[matmul_p](rt, size // (res_last_dim * self_last_dim), n_cores)
-
-        let res = self.__matmul[nelts](other, wrapper)
+        let res = self.__matmul[nelts, matmul_p](other)
 
         return res ^
 
     fn __matmul[
-        nelts: Int
-    ](self, other: Self, func: fn (Self, Int, Int, Int, Int) capturing -> None) -> Self:
+        nelts: Int,
+        outer_loop_func: fn[func: fn (Int) capturing -> None] (Int) capturing -> None,
+    ](self, other: Self) -> Self:
         if self.dims.rank() == 1 and other.dims.rank() == 1:
             return self.dot[nelts](other)
 
@@ -673,6 +624,28 @@ struct TensorG[Type: DType]:
 
         let size = self.size * res_last_dim  # size to iterate over
 
-        func(res, res_last_dim, self_last_dim, res_penult_dim, size)
+        @parameter
+        # We use the for inside the parallel function to remove data races, so the vectorize function works in the last dimension of the res tensor and the for makes it so the for and vectorize function work on the penultimate dimension of the res tensor (so parallel works on the penultimate dimension of the res tensor)
+        fn outer_loop(i: Int):
+            for j in range(0, self_last_dim):
+
+                @parameter
+                fn matmul_v[nelts: Int](k: Int):
+                    let index_res = i * res_last_dim + k  # remove data races of parallel function
+                    let index_self = i * self_last_dim + j
+                    let index_other = (
+                        i // res_penult_dim
+                    ) * self_last_dim * res_last_dim + j * res_last_dim + k
+
+                    res.store[nelts](
+                        index_res,
+                        res.load[nelts](index_res)
+                        + self.load[1](index_self) * other.load[nelts](index_other),
+                    )
+
+                vectorize[nelts, matmul_v](res_last_dim)
+
+        # this function is going to be basically the outer for loop, the function is going to be calling outer_loop using any method it wants until range_size("size // (res_last_dim * self_last_dim)")
+        outer_loop_func[outer_loop](size // (res_last_dim * self_last_dim))
 
         return res ^
