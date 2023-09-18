@@ -7,6 +7,7 @@ from tensor import TensorShape
 from utils.vector import DynamicVector, InlinedFixedVector
 from runtime.llcl import num_cores, Runtime
 from algorithm import vectorize, parallelize
+from algorithm import Static2DTileUnitFunc as Tile2DFunc
 import math
 
 alias dims_average_size = 5
@@ -598,6 +599,14 @@ struct TensorG[Type: DType]:
 
         return res ^
 
+    @staticmethod
+    # Perform 2D tiling on the iteration space defined by end_x and end_y.
+    fn tile[tiled_fn: Tile2DFunc, tile_x: Int, tile_y: Int](end_x: Int, end_y: Int):
+        # Note: this assumes that ends are multiples of the tiles.
+        for y in range(0, end_y, tile_y):
+            for x in range(0, end_x, tile_x):
+                tiled_fn[tile_x, tile_y](x, y)
+
     fn __matmul[
         nelts: Int,
         outer_loop_func: fn[func: fn (Int) capturing -> None] (Int) capturing -> None,
@@ -625,26 +634,34 @@ struct TensorG[Type: DType]:
 
         let size = self.size * res_last_dim  # size to iterate over
 
-        @parameter
         # We use the for inside the parallel function to remove data races, so the vectorize function works in the last dimension of the res tensor and the for makes it so the for and vectorize function work on the penultimate dimension of the res tensor (so parallel works on the penultimate dimension of the res tensor)
+        @parameter
         fn outer_loop(i: Int):
-            for j in range(0, self_last_dim):
+            @parameter
+            fn calc_tile[tile_x: Int, tile_y: Int](x: Int, y: Int):
+                let j_range = math.min(self_last_dim, y + tile_y)
+                for j in range(y, j_range):
 
-                @parameter
-                fn matmul_v[nelts: Int](k: Int):
-                    let index_res = i * res_last_dim + k  # remove data races of parallel function
-                    let index_self = i * self_last_dim + j
-                    let index_other = (
-                        i // res_penult_dim
-                    ) * self_last_dim * res_last_dim + j * res_last_dim + k
+                    @parameter
+                    fn matmul_v[nelts: Int](k: Int):
+                        let index_res = i * res_last_dim + k + x  # remove data races of parallel function
+                        let index_self = i * self_last_dim + j
+                        let index_other = (
+                            i // res_penult_dim
+                        ) * self_last_dim * res_last_dim + j * res_last_dim + k + x
 
-                    res.store[nelts](
-                        index_res,
-                        res.load[nelts](index_res)
-                        + self.load[1](index_self) * other.load[nelts](index_other),
-                    )
+                        res.store[nelts](
+                            index_res,
+                            res.load[nelts](index_res)
+                            + self.load[1](index_self) * other.load[nelts](index_other),
+                        )
 
-                vectorize[nelts, matmul_v](res_last_dim)
+                    vectorize[nelts, matmul_v](math.min(res_last_dim - x, tile_x))
+
+            alias tile_size = 4
+            self.tile[calc_tile, nelts * tile_size, tile_size](
+                res_last_dim, self_last_dim
+            )
 
         # this function is going to be basically the outer for loop, the function is going to be calling outer_loop using any method it wants until range_size("size // (res_last_dim * self_last_dim)")
         outer_loop_func[outer_loop](size // (res_last_dim * self_last_dim))
