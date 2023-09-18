@@ -6,7 +6,7 @@ from utils.list import Dim, DimList
 from tensor import TensorShape
 from utils.vector import DynamicVector, InlinedFixedVector
 from runtime.llcl import num_cores, Runtime
-from algorithm import vectorize, parallelize
+from algorithm import vectorize, parallelize, vectorize_unroll
 from algorithm import Static2DTileUnitFunc as Tile2DFunc
 import math
 
@@ -656,7 +656,9 @@ struct TensorG[Type: DType]:
                             + self.load[1](index_self) * other.load[nelts](index_other),
                         )
 
-                    vectorize[nelts, matmul_v](math.min(res_last_dim - x, tile_x))
+                    vectorize_unroll[nelts, tile_x // nelts, matmul_v](
+                        math.min(res_last_dim - x, tile_x)
+                    )
 
             alias tile_size = 4
             self.tile[calc_tile, nelts * tile_size, tile_size](
