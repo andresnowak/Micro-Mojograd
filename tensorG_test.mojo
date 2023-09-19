@@ -1,4 +1,4 @@
-from tensorG import TensorG, TensorView
+from tensor_g import TensorG, TensorView
 from python import Python, PythonObject
 from runtime.llcl import num_cores, Runtime
 from time import time

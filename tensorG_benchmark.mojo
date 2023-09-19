@@ -1,5 +1,5 @@
 from time import now
-from tensorG import TensorG, TensorView
+from tensor_g import TensorG, TensorView
 from benchmark import Benchmark
 from runtime.llcl import num_cores, Runtime
 from time import time
