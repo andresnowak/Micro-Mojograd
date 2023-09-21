@@ -3,10 +3,12 @@
 For now this project is just about trying to recreate [Micrograd from andrej karpathy](https://github.com/karpathy/micrograd) but in mojo and with tensors.
 
 ## To-do
-- [x] Tensor: using 1d memory and not using MLIR
-- [x] Tensor Matmul
-- [x] Tensor sum elementwise
-- [x] Tensor Mul elementwise
-- [x] Tensor equal operator
-- [ ] Tensor broadcasting
-- [ ] Autograd: *For now doing the autogradient part is difficult, because mojo still doesn't have complete ownership and lifetime support.*
+
+-   [x] Tensor: using 1d memory and not using MLIR
+-   [x] Tensor Matmul
+-   [x] Tensor sum elementwise
+-   [x] Tensor Mul elementwise
+-   [x] Tensor equal operator
+-   [ ] Tensor broadcasting
+-   [ ] Fix problem where parallel version of element-wise operations (add, mul, eq, etc.) are slower than the sequential version.
+-   [ ] Autograd: _For now doing the autogradient part is difficult, because mojo still doesn't have complete ownership and lifetime support._
