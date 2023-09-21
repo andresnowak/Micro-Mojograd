@@ -245,54 +245,65 @@ struct TensorG[Type: DType]:
     fn rank(self) -> Int:
         return self.dims.rank()
 
+    fn __iterate_binary_op_tensor[
+        nelts: Int,
+        outer_loop_func: fn[func: fn (Int) capturing -> None] (Int) capturing -> None,
+        op_func: fn[T: DType, simd_width: Int] (
+            x: SIMD[T, simd_width], y: SIMD[T, simd_width]
+        ) -> SIMD[T, simd_width],
+    ](self, other: Self) -> Self:
+        let dims_eq = self.dims == other.dims
+        debug_assert(
+            dims_eq, "Error dimension aren't equal can't do operation element wise."
+        )
+
+        let res = Self(False, self.dims)
+        let size = self.dims.num_elements()
+
+        let last_dim = self.dims[-1]
+        var dims_rest = size // last_dim
+
+        @parameter
+        fn outer_loop(i: Int):
+            @parameter
+            fn iterate_vectorize[nelts: Int](j: Int):
+                let index = i * last_dim + j
+
+                res.store[nelts](
+                    index,
+                    op_func[Type, nelts](
+                        self.load[nelts](index), other.load[nelts](index)
+                    ),
+                )
+
+            vectorize[nelts, iterate_vectorize](last_dim)
+
+        outer_loop_func[outer_loop](dims_rest)
+
+        return res ^
+
     @always_inline
     fn __add__(self, other: Self) -> Self:
         return self.add[1](other)
 
     @always_inline
     fn add[nelts: Int](self, other: Self) -> Self:
-        let dims_eq = self.dims == other.dims
-        debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
-
-        let res = Self(False, self.dims)
-        let size = self.dims.num_elements()
-
         @parameter
-        fn iterate_vectorize[nelts: Int](i: Int):
-            res.store[nelts](
-                i,
-                self.load[nelts](i) + other.load[nelts](i),
-            )
+        fn sum_v[outer_loop: fn (Int) capturing -> None](range_size: Int):
+            for i in range(range_size):
+                outer_loop(i)
 
-        vectorize[nelts, iterate_vectorize](size)
+        let res = self.__iterate_binary_op_tensor[nelts, sum_v, math.add](other)
 
         return res ^
 
     @always_inline
     fn add[nelts: Int](self, other: Self, rt: Runtime, n_cores: Int) -> Self:
-        let dims_eq = self.dims == other.dims
-        debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
-
-        let res = Self(False, self.dims)
-        let size = self.dims.num_elements()
-
-        let first_dim = self.dims[0]
-        let dims_rest = size // first_dim  # the rest of the dimensions
-
         @parameter
-        fn iterate_parallel(i: Int):
-            @parameter
-            fn iterate_vectorize[nelts: Int](j: Int):
-                let index = i * dims_rest + j
+        fn sum_p[outer_loop: fn (Int) capturing -> None](range_size: Int):
+            parallelize[outer_loop](rt, range_size, n_cores)
 
-                res.store[nelts](
-                    index,
-                    self.load[nelts](index) + other.load[nelts](index),
-                )
-
-            vectorize[nelts, iterate_vectorize](dims_rest)
-
-        parallelize[iterate_parallel](rt, first_dim, n_cores)
+        let res = self.__iterate_binary_op_tensor[nelts, sum_p, math.add](other)
 
         return res ^
 
@@ -301,47 +312,22 @@ struct TensorG[Type: DType]:
 
     @always_inline
     fn mul[nelts: Int](self, other: Self) -> Self:
-        let dims_eq = self.dims == other.dims
-        debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
-
-        let res = Self(False, self.dims)
-        let size = self.dims.num_elements()
-
         @parameter
-        fn iterate_vectorize[nelts: Int](i: Int):
-            res.store[nelts](
-                i,
-                self.load[nelts](i) * other.load[nelts](i),
-            )
+        fn mul_v[outer_loop: fn (Int) capturing -> None](range_size: Int):
+            for i in range(range_size):
+                outer_loop(i)
 
-        vectorize[nelts, iterate_vectorize](size)
+        let res = self.__iterate_binary_op_tensor[nelts, mul_v, math.mul](other)
 
         return res ^
 
     @always_inline
     fn mul[nelts: Int](self, other: Self, rt: Runtime, n_cores: Int) -> Self:
-        let dims_eq = self.dims == other.dims
-        debug_assert(dims_eq, "Error dimension aren't equal can't sum tensors.")
-
-        let res = Self(False, self.dims)
-        let size = self.dims.num_elements()
-
-        let first_dim = self.dims[0]
-        let dims_rest = size // first_dim  # the rest of the dimensions
-
         @parameter
-        fn iterate_parallel(i: Int):
-            @parameter
-            fn iterate_vectorize[nelts: Int](j: Int):
-                let index = i * dims_rest + j
-                res.store[nelts](
-                    index,
-                    self.load[nelts](index) * other.load[nelts](index),
-                )
+        fn mul_p[outer_loop: fn (Int) capturing -> None](range_size: Int):
+            parallelize[outer_loop](rt, range_size, n_cores)
 
-            vectorize[nelts, iterate_vectorize](dims_rest)
-
-        parallelize[iterate_parallel](rt, first_dim, n_cores)
+        let res = self.__iterate_binary_op_tensor[nelts, mul_p, math.mul](other)
 
         return res ^
 
