@@ -19,6 +19,7 @@ struct TensorG[Type: DType]:
     var data: DTypePointer[Type]
     var dims: TensorView
     var size: Int
+    alias simd_width = simdwidthof[Type]()
 
     fn __init__(inout self, random: Bool, *dims: Int):
         self.dims = TensorView(dims)
@@ -284,7 +285,7 @@ struct TensorG[Type: DType]:
 
     @always_inline
     fn __add__(self, other: Self) -> Self:
-        return self.add[1](other)
+        return self.add[TensorG[Type].simd_width](other)
 
     @always_inline
     fn add[nelts: Int](self, other: Self) -> Self:
@@ -308,7 +309,7 @@ struct TensorG[Type: DType]:
         return res ^
 
     fn __mul__(self, other: Self) -> Self:
-        return self.mul[1](other)
+        return self.mul[TensorG[Type].simd_width](other)
 
     @always_inline
     fn mul[nelts: Int](self, other: Self) -> Self:
@@ -404,7 +405,7 @@ struct TensorG[Type: DType]:
 
     @always_inline
     fn __matmul__(self, other: Self) -> Self:
-        return self.matmul[1](other)
+        return self.matmul[TensorG[Type].simd_width](other)
 
     @always_inline
     fn matmul[nelts: Int](self, other: Self) -> Self:
