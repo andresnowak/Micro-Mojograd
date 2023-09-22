@@ -139,6 +139,21 @@ struct TensorView:
 
         return self.__get_position(get_index_value)
 
+    @always_inline
+    fn get_dimension_position(self, index: Int, dim_index: Int) -> Int:
+        """Convert position of a dimension to it's 1D position."""
+
+        debug_assert(
+            index >= self.tensor_shape[dim_index],
+            "Index out of bounds of it's dimension",
+        )
+        debug_assert(dim_index >= self.rank(), "Dimension index out of bounds")
+
+        return (
+            __negative_pos_to_positive(index, self.tensor_shape[dim_index])
+            * self.strides[dim_index]
+        )
+
     fn __getitem__(self, index: Int) -> Int:
         let pos = __negative_pos_to_positive(index, self.len)
         __check_bounds(pos, self.len)
