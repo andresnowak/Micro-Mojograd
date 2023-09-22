@@ -1,5 +1,4 @@
 from utils.vector import InlinedFixedVector
-from algorithm.sort import sort
 
 from .helpers import __check_bounds, __negative_pos_to_positive
 
@@ -201,25 +200,29 @@ struct TensorView:
         pass
 
     fn reshape(inout self, *dims: Int):
-        var dims_list = VariadicList(dims)
+        let temp = VariadicList(dims)
+
+        self.reshape(temp)
+
+    fn reshape(inout self, dims: VariadicList[Int]):
         var size = 1
 
-        for i in range(len(dims_list)):
-            size *= dims_list[i]
+        for i in range(len(dims)):
+            size *= dims[i]
 
         debug_assert(size == self.size, "New shape must have same number of elements")
 
         @parameter
         fn get_index_value(i: Int) -> Int:
-            return dims_list[i]
+            return dims[i]
 
         self.tensor_shape.free()
-        self.tensor_shape = Pointer[Int].alloc(len(dims_list))
+        self.tensor_shape = Pointer[Int].alloc(len(dims))
         self.__fill_tensor_shape(self.len, get_index_value)
 
         self.strides.free()
-        self.strides = Pointer[Int].alloc(len(dims_list))
+        self.strides = Pointer[Int].alloc(len(dims))
         self.__suffix_product()
 
         self.size = size
-        self.len = len(dims_list)
+        self.len = len(dims)
