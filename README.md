@@ -10,5 +10,7 @@ For now this project is just about trying to recreate [Micrograd from andrej kar
 -   [x] Tensor Mul elementwise
 -   [x] Tensor equal operator
 -   [ ] Tensor broadcasting
+-   [ ] Tensor reshape
+-   [ ] Tensor transpose
 -   [ ] Fix problem where parallel version of element-wise operations (add, mul, eq, etc.) are slower than the sequential version.
 -   [ ] Autograd: _For now doing the autogradient part is difficult, because mojo still doesn't have complete ownership and lifetime support._
