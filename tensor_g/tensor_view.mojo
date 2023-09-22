@@ -1,60 +1,108 @@
 from utils.vector import InlinedFixedVector
+from algorithm.sort import sort
 
 from .helpers import __check_bounds, __negative_pos_to_positive
+
+alias dims_average_size = 5
 
 
 struct TensorView:
     var tensor_shape: Pointer[Int]
-    var size: Int
-    var len: Int
+    var size: Int  # amount of values in tensor
+    var len: Int  # rank of tensor
+    var strides: Pointer[Int]
 
     fn __init__(inout self, *dims: Int):
         let temp = VariadicList(
             dims
         )  # because i dont know how to get the size with the variadic MLIR
-        self.tensor_shape = Pointer[Int].alloc(len(temp))
-        for i in range(len(temp)):
-            self.tensor_shape.store(i, temp[i])
         self.len = len(temp)
+        self.tensor_shape = Pointer[Int].alloc(self.len)
         self.size = 1
+        self.strides = Pointer[Int].alloc(self.len)
+
+        @parameter
+        fn get_index_value(i: Int) -> Int:
+            return temp[i]
+
+        self.__fill_tensor_shape(self.len, get_index_value)
         self.size = self.product_dimensions()
+        self.__suffix_product()
 
     fn __init__(inout self, dims: VariadicList[Int]):
         self.tensor_shape = Pointer[Int].alloc(len(dims))
-        for i in range(len(dims)):
-            self.tensor_shape.store(i, dims[i])
         self.len = len(dims)
         self.size = 1
+        self.strides = Pointer[Int].alloc(self.len)
+
+        @parameter
+        fn get_index_value(i: Int) -> Int:
+            return dims[i]
+
+        self.__fill_tensor_shape(self.len, get_index_value)
         self.size = self.product_dimensions()
+        self.__suffix_product()
 
     fn __init__[size: Int](inout self, dims: InlinedFixedVector[size, Int]):
         self.tensor_shape = Pointer[Int].alloc(len(dims))
-        for i in range(len(dims)):
-            self.tensor_shape.store(i, dims[i])
         self.len = len(dims)
         self.size = 1
+        self.strides = Pointer[Int].alloc(self.len)
+
+        @parameter
+        fn get_index_value(i: Int) -> Int:
+            return dims[i]
+
+        self.__fill_tensor_shape(self.len, get_index_value)
         self.size = self.product_dimensions()
+        self.__suffix_product()
 
     fn __copyinit__(inout self: Self, existing: Self):
         """Creates a deep copy of an existing shape."""
         self.tensor_shape = existing.tensor_shape
         self.size = existing.size
         self.len = existing.len
+        self.strides = existing.strides
 
     fn __moveinit__(inout self: Self, owned existing: Self):
         """Moves exsiting shape into new shape."""
         self.tensor_shape = existing.tensor_shape ^
         self.size = existing.size
         self.len = existing.len
+        self.strides = existing.strides ^
 
     # fn __del__(owned self):
     #     self.tensor_shape.free()
+
+    fn __fill_tensor_shape(self, size: Int, get_index_value: fn (Int) capturing -> Int):
+        for i in range(size):
+            self.tensor_shape.store(i, get_index_value(i))
 
     fn product_dimensions(self) -> Int:
         var size = 1
         for i in range(self.rank()):
             size *= self.tensor_shape[i]
         return size
+
+    fn __suffix_product(inout self) -> None:
+        """Strides has to be already initialized with the correct size."""
+        self.strides.store(0, 1)  # the first value has to be 1
+
+        for index in range(self.rank() - 1):
+            self.strides.store(
+                index + 1,
+                self.strides[index] * self.tensor_shape[self.rank() - 1 - index],
+            )
+
+        sort(self.strides, self.rank())
+
+    fn stride(self) -> InlinedFixedVector[dims_average_size, Int]:
+        var strides = InlinedFixedVector[dims_average_size, Int](self.rank())
+
+        for i in range(self.rank()):
+            strides.append(self.strides[i])
+
+        return strides
 
     fn __get_position(self, get_index_value: fn (Int) capturing -> Int) -> Int:
         """Convert position from tuple of index dimensions to 1D position."""
@@ -150,3 +198,9 @@ struct TensorView:
         for i in range(self.rank()):
             print_no_newline(self[i], ",")
         print("]")
+
+    fn permute(self):
+        pass
+
+    fn reshape(self, *dims: Int):
+        pass
