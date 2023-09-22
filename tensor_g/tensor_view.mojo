@@ -86,15 +86,13 @@ struct TensorView:
 
     fn __suffix_product(inout self) -> None:
         """Strides has to be already initialized with the correct size."""
-        self.strides.store(0, 1)  # the first value has to be 1
+        self.strides.store(self.rank() - 1, 1)  # the first value has to be 1
 
         for index in range(self.rank() - 1):
             self.strides.store(
-                index + 1,
+                self.rank() - 2 - index,
                 self.strides[index] * self.tensor_shape[self.rank() - 1 - index],
             )
-
-        sort(self.strides, self.rank())
 
     fn stride(self) -> InlinedFixedVector[dims_average_size, Int]:
         var strides = InlinedFixedVector[dims_average_size, Int](self.rank())
