@@ -104,7 +104,8 @@ struct TensorView:
         print("]")
 
     fn __eq__(self, other: TensorView) -> Bool:
-        return self._dims == other._dims and self._strides == other._strides
+        """Check that both tensors have the same dimension."""
+        return self._dims == other._dims
 
     fn matmul_eq(self, other: TensorView) -> Bool:
         """Check if the tensor is compatible with the other tensor for a matrix multiplication.
@@ -135,7 +136,7 @@ struct TensorView:
 
         return strides
 
-    fn __check_is_contiguous(self) -> Bool:
+    fn check_is_contiguous(self) -> Bool:
         var c_contiguous = 1
         var f_contiguous = self._size
         for i in range(self._rank):
@@ -148,14 +149,54 @@ struct TensorView:
             f_contiguous /= self._dims[i]
         return True
 
+    fn __check_reshape_possible(
+        self, new_rank: Int, get_value_from_index: fn (Int) capturing -> Int
+    ) -> Bool:
+        var new_size = 1
+
+        for i in range(new_rank):
+            new_size *= get_value_from_index(i)
+
+        return new_size == self._size
+
     fn reshape(self, *dims: Int) -> TensorView:
-        pass
+        fn get_value_from_index(index: Int) -> Int:
+            return dims[index]
+
+        debug_assert(
+            self.__check_reshape_possible(
+                len(VariadicList(dims)), get_value_from_index
+            ),
+            "The new shape must have the same number of elements as the old shape",
+        )
+
+        return TensorView(dims)
 
     fn reshape(self, dims: VariadicList[Int]) -> TensorView:
-        pass
+        fn get_value_from_index(index: Int) -> Int:
+            return dims[index]
+
+        debug_assert(
+            self.__check_reshape_possible(
+                len(VariadicList(dims)), get_value_from_index
+            ),
+            "The new shape must have the same number of elements as the old shape",
+        )
+
+        return TensorView(dims)
 
     fn reshape(self, dims: InlinedFixedVector[dims_average_size, Int]) -> TensorView:
-        pass
+        fn get_value_from_index(index: Int) -> Int:
+            return dims[index]
+
+        debug_assert(
+            self.__check_reshape_possible(
+                len(VariadicList(dims)), get_value_from_index
+            ),
+            "The new shape must have the same number of elements as the old shape",
+        )
+
+        return TensorView(dims)
 
     fn permute(self, *dims: Int) -> TensorView:
         pass
