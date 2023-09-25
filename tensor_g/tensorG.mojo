@@ -15,14 +15,14 @@ from .tensor_view import TensorView
 alias dims_average_size = 5
 
 
-struct TensorG[Type: DType]:
+struct TensorG[rank_size: Int, Type: DType]:
     var data: DTypePointer[Type]
-    var dims: TensorView
+    var dims: TensorView[rank_size]
     var size: Int
     alias simd_width = simdwidthof[Type]()
 
     fn __init__(inout self, random: Bool, *dims: Int):
-        self.dims = TensorView(dims)
+        self.dims = TensorView[rank_size](dims)
         self.size = 1
         self.size = self.dims.num_elements()
 
@@ -33,7 +33,7 @@ struct TensorG[Type: DType]:
         else:
             self.zero()
 
-    fn __init__(inout self, random: Bool, dims: TensorView):
+    fn __init__(inout self, random: Bool, dims: TensorView[rank_size]):
         self.dims = dims
         self.size = 1
         self.size = self.dims.num_elements()
@@ -47,7 +47,7 @@ struct TensorG[Type: DType]:
     fn __init__(
         inout self,
         data: VariadicList[FloatLiteral],
-        dims: TensorView,
+        dims: TensorView[rank_size],
     ):
         self.dims = dims
         self.size = 1
@@ -66,7 +66,7 @@ struct TensorG[Type: DType]:
     fn __init__(
         inout self,
         data: DynamicVector[FloatLiteral],
-        dims: TensorView,
+        dims: TensorView[rank_size],
     ):
         self.dims = dims
         self.size = 1
@@ -285,7 +285,7 @@ struct TensorG[Type: DType]:
 
     @always_inline
     fn __add__(self, other: Self) -> Self:
-        return self.add[TensorG[Type].simd_width](other)
+        return self.add[TensorG[rank_size, Type].simd_width](other)
 
     @always_inline
     fn add[nelts: Int](self, other: Self) -> Self:
@@ -309,7 +309,7 @@ struct TensorG[Type: DType]:
         return res ^
 
     fn __mul__(self, other: Self) -> Self:
-        return self.mul[TensorG[Type].simd_width](other)
+        return self.mul[TensorG[rank_size, Type].simd_width](other)
 
     @always_inline
     fn mul[nelts: Int](self, other: Self) -> Self:
@@ -405,7 +405,7 @@ struct TensorG[Type: DType]:
 
     @always_inline
     fn __matmul__(self, other: Self) -> Self:
-        return self.matmul[TensorG[Type].simd_width](other)
+        return self.matmul[TensorG[rank_size, Type].simd_width](other)
 
     @always_inline
     fn matmul[nelts: Int](self, other: Self) -> Self:
@@ -451,7 +451,7 @@ struct TensorG[Type: DType]:
             res_dims.append(self.dims[i])
         res_dims.append(other.dims[other.dims.rank() - 1])
 
-        let res = Self(False, TensorView(res_dims))
+        let res = Self(False, TensorView[rank_size](res_dims))
         # let size = self.__matmul_num_elements(other)
 
         # The dimension that is different for self and other (other dim)

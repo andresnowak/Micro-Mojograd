@@ -12,8 +12,12 @@ alias mul_pool = 4
 
 
 fn test_matmul[
-    Type: DType, nelts: Int
-](A: TensorG[Type], B: TensorG[Type], C: TensorG[Type]) -> Bool:
+    rank_size: Int, Type: DType, nelts: Int
+](
+    A: TensorG[rank_size, Type],
+    B: TensorG[rank_size, Type],
+    C: TensorG[rank_size, Type],
+) -> Bool:
     var flag = True
 
     var res = A @ B
@@ -52,8 +56,12 @@ fn test_matmul[
 
 
 fn test_add[
-    Type: DType, nelts: Int
-](A: TensorG[Type], B: TensorG[Type], C: TensorG[Type]) -> Bool:
+    rank_size: Int, Type: DType, nelts: Int
+](
+    A: TensorG[rank_size, Type],
+    B: TensorG[rank_size, Type],
+    C: TensorG[rank_size, Type],
+) -> Bool:
     var flag = True
 
     var res = A + B
@@ -92,8 +100,12 @@ fn test_add[
 
 
 fn test_mul[
-    Type: DType, nelts: Int
-](A: TensorG[Type], B: TensorG[Type], C: TensorG[Type]) -> Bool:
+    rank_size: Int, Type: DType, nelts: Int
+](
+    A: TensorG[rank_size, Type],
+    B: TensorG[rank_size, Type],
+    C: TensorG[rank_size, Type],
+) -> Bool:
     var flag = True
 
     var res = A * B
@@ -132,8 +144,8 @@ fn test_mul[
 
 
 fn create_tensor_from_numpy[
-    Type: DType
-](np: PythonObject, shape: TensorView) -> TensorG[Type]:
+    rank_size: Int, Type: DType
+](np: PythonObject, shape: TensorView[rank_size]) -> TensorG[rank_size, Type]:
     let size = shape.num_elements()
 
     var res = DynamicVector[FloatLiteral](size)
@@ -149,12 +161,14 @@ fn create_tensor_from_numpy[
                 res.push_back(np[i].__index__())
     except:
         print("Error converting numpy array to tensor")
-        return TensorG[Type](False, shape)
+        return TensorG[rank_size, Type](False, shape)
 
-    return TensorG[Type](res, shape)
+    return TensorG[rank_size, Type](res, shape)
 
 
-fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView) -> Bool:
+fn test_same_dim[
+    rank_size: Int
+](I: Int, np_shape: PythonObject, tensor_shape: TensorView[rank_size]) -> Bool:
     from python import Python
 
     var flag = True
@@ -164,8 +178,8 @@ fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView) -> Bo
         var test_1 = np.random.randint(0, 20, tensor_shape.num_elements())
         var test_2 = np.random.randint(0, 20, tensor_shape.num_elements())
 
-        let A = create_tensor_from_numpy[type_f](test_1, tensor_shape)
-        let B = create_tensor_from_numpy[type_f](test_2, tensor_shape)
+        let A = create_tensor_from_numpy[rank_size, type_f](test_1, tensor_shape)
+        let B = create_tensor_from_numpy[rank_size, type_f](test_2, tensor_shape)
 
         # check shape size
         var shape_correct = A.dims.num_elements() == test_1.shape.__len__().__index__()
@@ -186,9 +200,9 @@ fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView) -> Bo
         var res = test_1 + test_2
 
         res = res.reshape(tensor_shape.num_elements())
-        var C = create_tensor_from_numpy[type_f](res, tensor_shape)
+        var C = create_tensor_from_numpy[rank_size, type_f](res, tensor_shape)
 
-        var res_correct = test_add[type_f, nelts](A, B, C)
+        var res_correct = test_add[rank_size, type_f, nelts](A, B, C)
         flag = res_correct and flag
         print("Add test ", I, ":", res_correct)
         print()
@@ -197,9 +211,9 @@ fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView) -> Bo
         res = test_1 * test_2
 
         res = res.reshape(tensor_shape.num_elements())
-        C = create_tensor_from_numpy[type_f](res, tensor_shape)
+        C = create_tensor_from_numpy[rank_size, type_f](res, tensor_shape)
 
-        res_correct = test_mul[type_f, nelts](A, B, C)
+        res_correct = test_mul[rank_size, type_f, nelts](A, B, C)
         flag = res_correct and flag
         print("Mul test ", I, ":", res_correct)
         print()
@@ -209,11 +223,13 @@ fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView) -> Bo
 
         if tensor_shape.rank() > 1:
             res = res.reshape(tensor_shape.num_elements())
-            C = create_tensor_from_numpy[type_f](res, tensor_shape)
+            C = create_tensor_from_numpy[rank_size, type_f](res, tensor_shape)
         else:
-            C = create_tensor_from_numpy[type_f](res, TensorView(1))
+            C = create_tensor_from_numpy[rank_size, type_f](
+                res, TensorView[rank_size](1)
+            )
 
-        res_correct = test_matmul[type_f, nelts](A, B, C)
+        res_correct = test_matmul[rank_size, type_f, nelts](A, B, C)
         flag = res_correct and flag
         print("Matmul test ", I, ":", res_correct)
         print()
@@ -224,13 +240,15 @@ fn test_same_dim(I: Int, np_shape: PythonObject, tensor_shape: TensorView) -> Bo
     return flag
 
 
-fn test_different_dim(
+fn test_different_dim[
+    rank_size: Int
+](
     I: Int,
     np_shape_1: PythonObject,
     np_shape_2: PythonObject,
-    tensor_shape_1: TensorView,
-    tensor_shape_2: TensorView,
-    tensor_shape_3: TensorView,
+    tensor_shape_1: TensorView[rank_size],
+    tensor_shape_2: TensorView[rank_size],
+    tensor_shape_3: TensorView[rank_size],
 ) -> Bool:
     from python import Python
 
@@ -242,8 +260,8 @@ fn test_different_dim(
         var test_1 = np.random.randint(0, 20, tensor_shape_1.num_elements())
         var test_2 = np.random.randint(0, 20, tensor_shape_2.num_elements())
 
-        let A = create_tensor_from_numpy[type_f](test_1, tensor_shape_1)
-        let B = create_tensor_from_numpy[type_f](test_2, tensor_shape_2)
+        let A = create_tensor_from_numpy[rank_size, type_f](test_1, tensor_shape_1)
+        let B = create_tensor_from_numpy[rank_size, type_f](test_2, tensor_shape_2)
 
         test_1 = test_1.reshape(np_shape_1)
         test_2 = test_2.reshape(np_shape_2)
@@ -251,14 +269,14 @@ fn test_different_dim(
         var res = np.matmul(test_1, test_2)
 
         res = res.reshape((tensor_shape_3.num_elements()))
-        let C = create_tensor_from_numpy[type_f](res, tensor_shape_3)
+        let C = create_tensor_from_numpy[rank_size, type_f](res, tensor_shape_3)
 
-        let res_correct = test_matmul[type_f, nelts](A, B, C)
+        let res_correct = test_matmul[rank_size, type_f, nelts](A, B, C)
         flag = res_correct and flag
         print("Matmul test ", I, ":", res_correct)
         print()
     except:
-        print("Error importing numpy 2")
+        print("Error importing numpy", I)
         return False
 
     return flag
@@ -270,65 +288,43 @@ fn main():
     var flag = True
     let start = time.now()
 
-    var tensor_shape = TensorView(5, 5, 5, 5, 5, 5)
-    let np_shape = (5, 5, 5, 5, 5, 5)
-    flag = test_same_dim(1, np_shape, tensor_shape) and flag
-    tensor_shape = TensorView(25, 25, 25)
-    let np_shape_2 = (25, 25, 25)
-    flag = test_same_dim(2, np_shape_2, tensor_shape) and flag
-    tensor_shape = TensorView(125, 125)
-    let np_shape_3 = (125, 125)
-    flag = test_same_dim(3, np_shape_3, tensor_shape) and flag
-    tensor_shape = TensorView(15_625)
-    let np_shape_4 = (15_625)
-    flag = test_same_dim(4, np_shape_4, tensor_shape) and flag
+    flag = (
+        test_same_dim(1, (5, 5, 5, 5, 5, 5), TensorView[6](5, 5, 5, 5, 5, 5)) and flag
+    )
+    flag = test_same_dim(2, (25, 25, 25), TensorView[3](25, 25, 25)) and flag
+    flag = test_same_dim(3, (125, 125), TensorView[2](125, 125)) and flag
+    flag = test_same_dim(4, (15_625), TensorView[1](15_625)) and flag
 
-    var tensor_shape_1 = TensorView(2, 2, 3)
-    var tensor_shape_2 = TensorView(2, 3, 2)
-    var tensor_shape_3 = TensorView(2, 2, 2)
-    let np_shape_1_1 = (2, 2, 3)
-    let np_shape_1_2 = (2, 3, 2)
     flag = (
         test_different_dim(
             5,
-            np_shape_1_1,
-            np_shape_1_2,
-            tensor_shape_1,
-            tensor_shape_2,
-            tensor_shape_3,
+            (2, 2, 3),
+            (2, 3, 2),
+            TensorView[3](2, 2, 3),
+            TensorView[3](2, 3, 2),
+            TensorView[3](2, 2, 2),
         )
         and flag
     )
-    tensor_shape_1 = TensorView(2, 4, 3)
-    tensor_shape_2 = TensorView(2, 3, 5)
-    tensor_shape_3 = TensorView(2, 4, 5)
-    let np_shape_2_1 = (2, 4, 3)
-    let np_shape_2_2 = (2, 3, 5)
     flag = (
         test_different_dim(
             6,
-            np_shape_2_1,
-            np_shape_2_2,
-            tensor_shape_1,
-            tensor_shape_2,
-            tensor_shape_3,
+            (2, 4, 3),
+            (2, 3, 5),
+            TensorView[3](2, 4, 3),
+            TensorView[3](2, 3, 5),
+            TensorView[3](2, 4, 5),
         )
         and flag
     )
-
-    tensor_shape_1 = TensorView(5, 2, 4, 3)
-    tensor_shape_2 = TensorView(5, 2, 3, 5)
-    tensor_shape_3 = TensorView(5, 2, 4, 5)
-    let np_shape_3_1 = (5, 2, 4, 3)
-    let np_shape_3_2 = (5, 2, 3, 5)
     flag = (
         test_different_dim(
             7,
-            np_shape_3_1,
-            np_shape_3_2,
-            tensor_shape_1,
-            tensor_shape_2,
-            tensor_shape_3,
+            (5, 2, 4, 3),
+            (5, 2, 3, 5),
+            TensorView[4](5, 2, 4, 3),
+            TensorView[4](5, 2, 3, 5),
+            TensorView[4](5, 2, 4, 5),
         )
         and flag
     )

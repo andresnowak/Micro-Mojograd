@@ -9,26 +9,9 @@ alias mul_pool = 4
 alias type_test = DType.float32
 
 
-fn bench_sum(matrix_1: TensorG[type_test], matrix_2: TensorG[type_test]):
-    _ = matrix_1 + matrix_1
-
-
-fn bench_sum_vectorized(matrix_1: TensorG[type_test], matrix_2: TensorG[type_test]):
-    _ = matrix_1.add[simd_size_float](matrix_2)
-
-
-fn bench_sum_parallelized(
-    matrix_1: TensorG[type_test],
-    matrix_2: TensorG[type_test],
-    rt: Runtime,
-    num_workers: Int,
-):
-    _ = matrix_1.add[simd_size_float](matrix_2, rt, num_workers)
-
-
-fn benchmark_sum(dims: TensorView):
-    let matrix_1 = TensorG[type_test](True, dims)
-    let matrix_2 = TensorG[type_test](True, dims)
+fn benchmark_sum[rank_size: Int](dims: TensorView[rank_size]):
+    let matrix_1 = TensorG[rank_size, type_test](True, dims)
+    let matrix_2 = TensorG[rank_size, type_test](True, dims)
 
     @parameter
     fn bench():
@@ -62,9 +45,9 @@ fn benchmark_sum(dims: TensorView):
         print("Parallelized:", parallelized, "ns")
 
 
-fn benchmark_mul(dims: TensorView):
-    let matrix_1 = TensorG[type_test](True, dims)
-    let matrix_2 = TensorG[type_test](True, dims)
+fn benchmark_mul[rank_size: Int](dims: TensorView[rank_size]):
+    let matrix_1 = TensorG[rank_size, type_test](True, dims)
+    let matrix_2 = TensorG[rank_size, type_test](True, dims)
 
     @parameter
     fn bench():
@@ -98,9 +81,9 @@ fn benchmark_mul(dims: TensorView):
         print("Parallelized:", parallelized, "ns")
 
 
-fn benchmark_matmul(dims: TensorView):
-    let matrix_1 = TensorG[type_test](True, dims)
-    let matrix_2 = TensorG[type_test](True, dims)
+fn benchmark_matmul[rank_size: Int](dims: TensorView[rank_size]):
+    let matrix_1 = TensorG[rank_size, type_test](True, dims)
+    let matrix_2 = TensorG[rank_size, type_test](True, dims)
 
     @parameter
     fn bench():
@@ -134,11 +117,11 @@ fn benchmark_matmul(dims: TensorView):
 fn main():
     let start = time.now()
     print("Benchmarking sum")
-    benchmark_sum(TensorView(512, 512, 512))
+    benchmark_sum(TensorView[3](512, 512, 512))
     print("Benchmarking mul")
-    benchmark_mul(TensorView(512, 512, 512))
+    benchmark_mul(TensorView[3](512, 512, 512))
     print("Benchmarking matmul")
-    benchmark_matmul(TensorView(512, 512))
+    benchmark_matmul(TensorView[3](512, 512))
     let end = time.now()
 
     print("Elapsed time:", (end - start) // 1_000_000, "ms")

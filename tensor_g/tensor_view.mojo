@@ -1,52 +1,43 @@
 from utils.vector import InlinedFixedVector
+from utils.index import StaticIntTuple
 
 from .helpers import __check_bounds, __negative_pos_to_positive
 
 alias dims_average_size = 5
 
 
-struct TensorView:
-    var tensor_shape: Pointer[Int]
+struct TensorView[rank_size: Int]:
+    var tensor_shape: StaticIntTuple[rank_size]
     var size: Int  # amount of values in tensor
     var len: Int  # rank of tensor
-    var strides: Pointer[Int]
+    var strides: StaticIntTuple[rank_size]
 
     fn __init__(inout self, *dims: Int):
         let temp = VariadicList(
             dims
         )  # because i dont know how to get the size with the variadic MLIR
         self.len = len(temp)
-        self.tensor_shape = Pointer[Int].alloc(self.len)
+        self.tensor_shape = StaticIntTuple[rank_size](dims)
         self.size = 1
-        self.strides = Pointer[Int].alloc(self.len)
+        self.strides = StaticIntTuple[rank_size]()
 
-        @parameter
-        fn get_index_value(i: Int) -> Int:
-            return temp[i]
-
-        self.__fill_tensor_shape(self.len, get_index_value)
         self.size = self.product_dimensions()
         self.__suffix_product()
 
     fn __init__(inout self, dims: VariadicList[Int]):
-        self.tensor_shape = Pointer[Int].alloc(len(dims))
+        self.tensor_shape = StaticIntTuple[rank_size](dims)
         self.len = len(dims)
         self.size = 1
-        self.strides = Pointer[Int].alloc(self.len)
+        self.strides = StaticIntTuple[rank_size]()
 
-        @parameter
-        fn get_index_value(i: Int) -> Int:
-            return dims[i]
-
-        self.__fill_tensor_shape(self.len, get_index_value)
         self.size = self.product_dimensions()
         self.__suffix_product()
 
     fn __init__[size: Int](inout self, dims: InlinedFixedVector[size, Int]):
-        self.tensor_shape = Pointer[Int].alloc(len(dims))
+        self.tensor_shape = StaticIntTuple[rank_size]()
         self.len = len(dims)
         self.size = 1
-        self.strides = Pointer[Int].alloc(self.len)
+        self.strides = StaticIntTuple[rank_size]()
 
         @parameter
         fn get_index_value(i: Int) -> Int:
@@ -73,9 +64,11 @@ struct TensorView:
     # fn __del__(owned self):
     #     self.tensor_shape.free()
 
-    fn __fill_tensor_shape(self, size: Int, get_index_value: fn (Int) capturing -> Int):
+    fn __fill_tensor_shape(
+        inout self, size: Int, get_index_value: fn (Int) capturing -> Int
+    ):
         for i in range(size):
-            self.tensor_shape.store(i, get_index_value(i))
+            self.tensor_shape[i] = get_index_value(i)
 
     fn product_dimensions(self) -> Int:
         var size = 1
@@ -85,21 +78,15 @@ struct TensorView:
 
     fn __suffix_product(inout self) -> None:
         """Strides has to be already initialized with the correct size."""
-        self.strides.store(self.rank() - 1, 1)  # the first value has to be 1
+        self.strides[self.rank() - 1] = 1  # the first value has to be 1
 
         for index in range(self.rank() - 1):
-            self.strides.store(
-                self.rank() - 2 - index,
-                self.strides[index] * self.tensor_shape[self.rank() - 1 - index],
+            self.strides[self.rank() - 2 - index] = (
+                self.strides[index] * self.tensor_shape[self.rank() - 1 - index]
             )
 
-    fn stride(self) -> InlinedFixedVector[dims_average_size, Int]:
-        var strides = InlinedFixedVector[dims_average_size, Int](self.rank())
-
-        for i in range(self.rank()):
-            strides.append(self.strides[i])
-
-        return strides
+    fn stride(self) -> StaticIntTuple[rank_size]:
+        return self.strides
 
     fn __get_position(self, get_index_value: fn (Int) capturing -> Int) -> Int:
         """Convert position from tuple of index dimensions to 1D position."""
@@ -164,7 +151,7 @@ struct TensorView:
         return self.len
 
     @always_inline
-    fn __eq__(self, other: TensorView) -> Bool:
+    fn __eq__(self, other: TensorView[rank_size]) -> Bool:
         if self.rank() != other.rank():
             return False
 
@@ -175,7 +162,7 @@ struct TensorView:
         return True
 
     @always_inline
-    fn eq_matmul(self, other: TensorView) -> Bool:
+    fn eq_matmul(self, other: TensorView[rank_size]) -> Bool:
         if self.rank() != other.rank():
             return False
 
@@ -201,7 +188,7 @@ struct TensorView:
         """Get number of elements in tensor view."""
         return self.size
 
-    fn shape(self) -> Pointer[Int]:
+    fn shape(self) -> StaticIntTuple[rank_size]:
         """Get shape of tensor view."""
         return self.tensor_shape
 
@@ -214,12 +201,12 @@ struct TensorView:
     fn permute(self):
         pass
 
-    fn reshape(inout self, *dims: Int):
-        let temp = VariadicList(dims)
+    fn reshape[new_rank_size: Int](inout self, *dims: Int) -> TensorView[new_rank_size]:
+        return self.reshape[new_rank_size](dims)
 
-        self.reshape(temp)
-
-    fn reshape(inout self, dims: VariadicList[Int]):
+    fn reshape[
+        new_rank_size: Int
+    ](inout self, dims: VariadicList[Int]) -> TensorView[new_rank_size]:
         var size = 1
 
         for i in range(len(dims)):
@@ -227,17 +214,4 @@ struct TensorView:
 
         debug_assert(size == self.size, "New shape must have same number of elements")
 
-        @parameter
-        fn get_index_value(i: Int) -> Int:
-            return dims[i]
-
-        self.tensor_shape.free()
-        self.tensor_shape = Pointer[Int].alloc(len(dims))
-        self.__fill_tensor_shape(self.len, get_index_value)
-
-        self.strides.free()
-        self.strides = Pointer[Int].alloc(len(dims))
-        self.__suffix_product()
-
-        self.size = size
-        self.len = len(dims)
+        return TensorView[new_rank_size](dims)
