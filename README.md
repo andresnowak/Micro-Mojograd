@@ -6,13 +6,13 @@ The Tensors for now need to know the rank size at compile time, because when we 
 
 ## To-do
 
--   [x] Tensor: using 1d memory and not using MLIR
--   [x] Tensor Matmul
--   [x] Tensor sum elementwise
--   [x] Tensor Mul elementwise
--   [x] Tensor equal operator
+-   [ ] Tensor Matmul
+-   [ ] Tensor sum elementwise
+-   [ ] Tensor Mul elementwise
+-   [ ] Tensor equal operator
 -   [ ] Tensor broadcasting
 -   [ ] Tensor reshape
 -   [ ] Tensor transpose
+-   [ ] Tensor permute
 -   [ ] Fix problem where parallel version of element-wise operations (add, mul, eq, etc.) are slower than the sequential version.
 -   [ ] Autograd: _For now doing the autogradient part is difficult, because mojo still doesn't have complete ownership and lifetime support._
