@@ -1,2 +1,1 @@
-from .tensorG import TensorG
-from .tensor_view import TensorView
+from .tensor_buffer import TensorBuffer
