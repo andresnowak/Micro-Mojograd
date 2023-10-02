@@ -85,16 +85,21 @@ struct TensorBuffer[type: DType]:
 
     fn __suffix_product(inout self):
         var size = 1
-        for i in range(self._rank):
-            self._strides[self._rank - 1 - i] = size
+        for i in range(self._rank - 1, -1, -1):
+            self._strides[i] = size
             size *= self._dims[i]
 
     # fn print_all(self):
     #     """Print The dimension of the tensor."""
-    #     print("[")
-    #     for i in range(self._rank):
-    #         print_no_newline(self[i], ",")
-    #     print("]")
+
+    #     let size = self.num_elements()
+
+    #     for i in range(size):
+    #         let value = self.get_1d_item(i)
+
+    #         @unroll
+    #         for j in range(DIMS_SIZE):
+    #             if j < self._rank:
 
     fn __eq__(self, other: Self) -> Bool:
         """Check that both tensors have the same dimension."""
@@ -121,6 +126,24 @@ struct TensorBuffer[type: DType]:
     fn __getitem__(self, index: VariadicList[Int]) -> SIMD[type, 1]:
         """Gets an element from the buffer from the specified index."""
         return self.data.load(self.__get_1d_position(index))
+
+    fn get_1d_item(self, index: Int) -> SIMD[type, 1]:
+        """Gets an element from the tensor buffer from the specified 1 dimensional index.
+        """
+        # if the tensor is contiguous, we can just return the index directly
+        if self.is_contiguous:
+            return index
+
+        var pos = 0
+        var suffix_product = 1
+
+        @unroll
+        for i in range(DIMS_SIZE - 1, -1, -1):
+            if i < self._rank:
+                pos += ((index // suffix_product) % self._dims[i]) * self._strides[i]
+                suffix_product *= self._dims[i]
+
+        return self.data.load(pos)
 
     # fn __getitem__[len: Int](self, index: StaticIntTuple[len]) -> SIMD[type, 1]:
     #     """Gets an element from the buffer from the specified index."""
@@ -176,7 +199,7 @@ struct TensorBuffer[type: DType]:
         """Get the strides of the tensor."""
         return self._strides
 
-    fn dims(self) -> StaticIntTuple[DIMS_SIZE]:
+    fn shape(self) -> StaticIntTuple[DIMS_SIZE]:
         """Get the dimensions of the tensor."""
         return self._dims
 
