@@ -4,6 +4,12 @@ This is for now going to be a **Toy project** to learn about how do tensors work
 
 When the language is a bit more mature and has complete lifetime and ownership support and Traits support, I will try to make a more complete version of this library, or maybe help another mojo project like [numojo](https://github.com/MadAlex1997/Mojo-Arrays)
 
+And it is going to be inspired by:
+
+-   [Micrograd](https://github.com/karpathy/micrograd)
+-   [Pytorch](https://github.com/pytorch/pytorch)
+-   [Tinygrad](https://github.com/tinygrad/tinygrad)
+
 ## To-do
 
 -   [ ] Tensor Matmul
