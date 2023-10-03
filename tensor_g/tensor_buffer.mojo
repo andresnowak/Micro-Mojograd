@@ -153,6 +153,18 @@ struct TensorBuffer[type: DType]:
         # check that the last dimension of the first tensor is equal to the second last dimension of the second tensor (ex. 2x3 * 3x4, 3 == 3)
         return self._dims[self._rank - 1] != other._dims[self._rank - 2]
 
+    @always_inline
+    fn __get_1d_position(self, index: VariadicList[Int]) -> Int:
+        """Get the 1D position from the lit of indices."""
+        var position = 0
+
+        @unroll
+        for i in range(DIMS_SIZE):
+            if i < self._rank:
+                position += index[i] * self._strides[i]
+
+        return position
+
     fn __getitem__(self, *index: Int) -> SIMD[type, 1]:
         """Gets an element from the buffer from the specified index."""
         return self.data.load(self.__get_1d_position(index))
@@ -211,18 +223,6 @@ struct TensorBuffer[type: DType]:
     #     - The buffer must be contiguous or width must be 1.
     #     """
     #     pass
-
-    @always_inline
-    fn __get_1d_position(self, index: VariadicList[Int]) -> Int:
-        """Get the 1D position from the lit of indices."""
-        var position = 0
-
-        @unroll
-        for i in range(DIMS_SIZE):
-            if i < self._rank:
-                position += index[i] * self._strides[i]
-
-        return position
 
     fn rank(self) -> Int:
         """Get the rank of the tensor."""
