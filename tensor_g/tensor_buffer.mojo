@@ -2,6 +2,7 @@ from utils.vector import InlinedFixedVector
 from utils.index import StaticIntTuple
 from random import rand
 from memory import memset_zero
+from math import min
 
 from .helpers import __check_bounds, __negative_pos_to_positive
 
@@ -28,7 +29,7 @@ struct TensorBuffer[type: DType]:
         else:
             self.zero()
         self._rank = len(VariadicList(dims))
-        self.__suffix_product()
+        self._strides = self.__suffix_product()
         self.is_contiguous = self.__check_is_contiguous()
 
     fn __init__(inout self, dims: VariadicList[Int], random: Bool = False):
@@ -43,7 +44,7 @@ struct TensorBuffer[type: DType]:
         else:
             self.zero()
         self._rank = len(dims)
-        self.__suffix_product()
+        self._strides = self.__suffix_product()
         self.is_contiguous = self.__check_is_contiguous()
 
     fn __init__(inout self, data: DTypePointer[type], dims: VariadicList[Int]):
@@ -54,7 +55,7 @@ struct TensorBuffer[type: DType]:
         self.is_contiguous = True
 
         self._rank = len(dims)
-        self.__suffix_product()
+        self._strides = self.__suffix_product()
         self.is_contiguous = self.__check_is_contiguous()
 
     fn __copyinit__(inout self, existing: TensorBuffer[type]):
@@ -83,28 +84,61 @@ struct TensorBuffer[type: DType]:
             size *= self._dims[i]
         return size
 
-    fn __suffix_product(inout self):
+    fn __suffix_product(self) -> StaticIntTuple[DIMS_SIZE]:
         var size = 1
+        var strides = StaticIntTuple[DIMS_SIZE](0)
         for i in range(self._rank - 1, -1, -1):
-            self._strides[i] = size
+            strides[i] = size
             size *= self._dims[i]
 
-    # fn print_all(self):
-    #     """Print The dimension of the tensor."""
+        return strides
 
-    #     let size = self.num_elements()
+    fn print_all(self):
+        """Print The dimension of the tensor."""
 
-    #     for i in range(size):
-    #         let value = self.get_1d_item(i)
+        let size = self.num_elements()
 
-    #         @unroll
-    #         for j in range(DIMS_SIZE):
-    #             if j < self._rank:
+        var count = 0
+        for i in range(size + 1):
+            var suffix_product = 1
+            count = 0
 
+            @unroll
+            for j in range(DIMS_SIZE - 1, -1, -1):
+                if j < self._rank:
+                    suffix_product *= self._dims[j]
+                    if i % suffix_product == 0 and i != 0:
+                        print_no_newline("]")
+                        count += 1
+
+            if i > 0 and i < size:
+                print_no_newline(",")
+
+            # print the new lines between dimensions
+            if i < size:
+                for i in range(min(count, 3)):
+                    print()
+
+            suffix_product = 1
+
+            @unroll
+            for j in range(DIMS_SIZE - 1, -1, -1):
+                if j < self._rank:
+                    suffix_product *= self._dims[j]
+                    if i % suffix_product == 0 and i != size:
+                        print_no_newline("[")
+
+            if i < size:
+                print_no_newline(self.get_1d_item(i))
+
+        print()
+
+    @always_inline
     fn __eq__(self, other: Self) -> Bool:
         """Check that both tensors have the same dimension."""
         return self._dims == other._dims
 
+    @always_inline
     fn matmul_eq(self, other: Self) -> Bool:
         """Check if the tensor is compatible with the other tensor for a matrix multiplication.
         """
@@ -127,6 +161,7 @@ struct TensorBuffer[type: DType]:
         """Gets an element from the buffer from the specified index."""
         return self.data.load(self.__get_1d_position(index))
 
+    @always_inline
     fn get_1d_item(self, index: Int) -> SIMD[type, 1]:
         """Gets an element from the tensor buffer from the specified 1 dimensional index.
         """
@@ -177,6 +212,7 @@ struct TensorBuffer[type: DType]:
     #     """
     #     pass
 
+    @always_inline
     fn __get_1d_position(self, index: VariadicList[Int]) -> Int:
         """Get the 1D position from the lit of indices."""
         var position = 0
