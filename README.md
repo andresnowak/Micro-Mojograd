@@ -1,6 +1,6 @@
 # Micro-Mojograd
 
-This is for now going to be a **Toy project** to learn about how do tensors work, how to make them efficient, how to do the computational graph efficiently and the Autograd part.
+This is for now going to be a **Toy project** to learn about how do tensors work, how to make them efficient, how to do the computational graph efficiently (like joining element wise operationss or making a tensors contiguous when it used in more than one operation *use more memory but have better performance*, etc...) and the Autograd part.
 
 When the language is a bit more mature and has complete lifetime and ownership support and Traits support, I will try to make a more complete version of this library, or maybe help another mojo project like [numojo](https://github.com/MadAlex1997/Mojo-Arrays)
 
