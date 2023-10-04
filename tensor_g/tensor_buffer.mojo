@@ -24,6 +24,7 @@ struct TensorBuffer[type: DType]:
         self._rank = 1
         self.is_contiguous = True
 
+        self.data = DTypePointer[type].alloc(self.num_elements())
         if random:
             rand(self.data, self.num_elements())
         else:
@@ -32,6 +33,10 @@ struct TensorBuffer[type: DType]:
         self._strides = self.__suffix_product()
         self.is_contiguous = self.__check_is_contiguous()
 
+        for i in range(self._rank, DIMS_SIZE):
+            self._dims[i] = 0
+            self._strides[i] = 0
+
     fn __init__(inout self, dims: VariadicList[Int], random: Bool = False):
         self.data = DTypePointer[type].alloc(0)
         self._dims = StaticIntTuple[DIMS_SIZE](dims)
@@ -39,6 +44,7 @@ struct TensorBuffer[type: DType]:
         self._rank = 1
         self.is_contiguous = True
 
+        self.data = DTypePointer[type].alloc(self.num_elements())
         if random:
             rand(self.data, self.num_elements())
         else:
@@ -46,6 +52,32 @@ struct TensorBuffer[type: DType]:
         self._rank = len(dims)
         self._strides = self.__suffix_product()
         self.is_contiguous = self.__check_is_contiguous()
+
+        for i in range(self._rank, DIMS_SIZE):
+            self._dims[i] = 0
+            self._strides[i] = 0
+
+    fn __init__(
+        inout self, dims: StaticIntTuple[DIMS_SIZE], rank: Int, random: Bool = False
+    ):
+        self.data = DTypePointer[type].alloc(0)
+        self._dims = dims
+        self._strides = StaticIntTuple[DIMS_SIZE](0)
+        self._rank = 1
+        self.is_contiguous = True
+
+        self.data = DTypePointer[type].alloc(self.num_elements())
+        if random:
+            rand(self.data, self.num_elements())
+        else:
+            self.zero()
+        self._rank = rank
+        self._strides = self.__suffix_product()
+        self.is_contiguous = self.__check_is_contiguous()
+
+        for i in range(self._rank, DIMS_SIZE):
+            self._dims[i] = 0
+            self._strides[i] = 0
 
     fn __init__(inout self, data: DTypePointer[type], dims: VariadicList[Int]):
         self.data = DTypePointer[type](data.address)
@@ -57,6 +89,10 @@ struct TensorBuffer[type: DType]:
         self._rank = len(dims)
         self._strides = self.__suffix_product()
         self.is_contiguous = self.__check_is_contiguous()
+
+        for i in range(self._rank, DIMS_SIZE):
+            self._dims[i] = 0
+            self._strides[i] = 0
 
     fn __copyinit__(inout self, existing: TensorBuffer[type]):
         self._dims = existing._dims
@@ -225,12 +261,16 @@ struct TensorBuffer[type: DType]:
         """Sets an element in the buffer at the specified index."""
         self.data.store(self.__get_1d_position(index), value)
 
-    fn __setitem__(self, value: SIMD[type, 1], index: VariadicList[Int]):
+    fn __setitem__(
+        self,
+        index: VariadicList[Int],
+        value: SIMD[type, 1],
+    ):
         """Sets an element in the buffer at the specified index."""
         self.data.store(self.__get_1d_position(index), value)
 
     @always_inline
-    fn set_1d_item(self, value: SIMD[type, 1], index: Int):
+    fn set_1d_item(self, index: Int, value: SIMD[type, 1]):
         """Sets an element in the buffer at the specified 1D index."""
         self.data.store(self.__get_real_1d_index(index), value)
 
