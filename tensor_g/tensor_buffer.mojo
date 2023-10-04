@@ -220,10 +220,12 @@ struct TensorBuffer[type: DType]:
 
         return pos
 
+    @always_inline
     fn __getitem__(self, *index: Int) -> SIMD[type, 1]:
         """Gets an element from the buffer from the specified index."""
         return self.data.load(self.__get_1d_position(index))
 
+    @always_inline
     fn __getitem__(self, index: VariadicList[Int]) -> SIMD[type, 1]:
         """Gets an element from the buffer from the specified index."""
         return self.data.load(self.__get_1d_position(index))
@@ -244,6 +246,7 @@ struct TensorBuffer[type: DType]:
     #     """Gets an element from the buffer from the specified index."""
     #     pass
 
+    @always_inline
     fn simd_load[width: Int](self, index: Int) -> SIMD[type, width]:
         """
         Loads a value from the buffer at the specified index.
@@ -255,12 +258,25 @@ struct TensorBuffer[type: DType]:
             self.is_contiguous or width == 1,
             "The buffer must be contiguous or width must be 1.",
         )
-        return self.data.simd_load[width](index)
+        return self.data.simd_load[width](self.__get_real_1d_index(index))
 
+    @always_inline
+    fn simd_strided_load[
+        width: Int
+    ](self, index: Int, stride: Int) -> SIMD[type, width]:
+        """
+        Performs a strided load of the SIMD vector at the specified index.
+        """
+        return self.data.offset(self.__get_real_1d_index(index)).simd_load[width](
+            stride
+        )
+
+    @always_inline
     fn __setitem__(self, value: SIMD[type, 1], *index: Int):
         """Sets an element in the buffer at the specified index."""
         self.data.store(self.__get_1d_position(index), value)
 
+    @always_inline
     fn __setitem__(
         self,
         index: VariadicList[Int],
@@ -274,6 +290,7 @@ struct TensorBuffer[type: DType]:
         """Sets an element in the buffer at the specified 1D index."""
         self.data.store(self.__get_real_1d_index(index), value)
 
+    @always_inline
     fn simd_store[width: Int](self, index: Int, value: SIMD[type, width]):
         """
         Stores a value in the buffer at the specified index.
@@ -285,7 +302,18 @@ struct TensorBuffer[type: DType]:
             self.is_contiguous or width == 1,
             "The buffer must be contiguous or width must be 1.",
         )
-        return self.data.simd_store[width](index, value)
+        self.data.simd_store[width](self.__get_real_1d_index(index), value)
+
+    @always_inline
+    fn simd_strided_store[
+        width: Int
+    ](self, index: Int, stride: Int, value: SIMD[type, width]):
+        """
+        Performs a strided store of the SIMD vector at the specificied index.
+        """
+        self.data.offset(self.__get_real_1d_index(index)).simd_strided_store[width](
+            value, stride
+        )
 
     fn rank(self) -> Int:
         """Get the rank of the tensor."""
