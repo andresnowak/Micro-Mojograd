@@ -267,9 +267,9 @@ struct TensorBuffer[type: DType]:
         """
         Performs a strided load of the SIMD vector at the specified index.
         """
-        return self.data.offset(self.__get_real_1d_index(index)).simd_load[width](
-            stride
-        )
+        return self.data.offset(self.__get_real_1d_index(index)).simd_strided_load[
+            width
+        ](stride)
 
     @always_inline
     fn __setitem__(self, value: SIMD[type, 1], *index: Int):

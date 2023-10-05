@@ -1,3 +1,5 @@
+from algorithm import vectorize
+
 from .tensor_buffer import TensorBuffer
 
 alias dims_average_size = 5
@@ -34,29 +36,48 @@ struct TensorG[type: DType]:
     fn simd_load[simd_width: Int](self, index: Int) -> SIMD[type, simd_width]:
         return self.data.simd_load[simd_width](index)
 
+    fn simd_strided_load[
+        simd_width: Int
+    ](self, index: Int, stride: Int) -> SIMD[type, simd_width]:
+        return self.data.simd_strided_load[simd_width](index, stride)
+
     fn __setitem__(self, index: Int, value: SIMD[type, 1]):
         self.data.set_1d_item(index, value)
 
     fn simd_store[simd_width: Int](self, index: Int, value: SIMD[type, simd_width]):
         self.data.simd_store[simd_width](index, value)
 
+    fn simd_strided_store[
+        simd_width: Int
+    ](self, index: Int, stride: Int, value: SIMD[type, simd_width]):
+        self.data.simd_strided_store[simd_width](index, stride, value)
+
     fn __add__(self, other: Self) -> Self:
         let size = self.data.num_elements()
 
-        let result = Self(self.shape(), self.data.rank(), False)
+        let result = Self(self.shape(), self.data.rank(), False)  # is contiguous
 
-        for i in range(size):
+        print(self.data.is_contiguous, other.data.is_contiguous)
+
+        @parameter
+        fn v_add[nelts: Int](i: Int):
             if self.data.is_contiguous and other.data.is_contiguous:
-                result.simd_store[TensorG[type].simd_width](
+                result.simd_store[nelts](
                     i,
-                    self.simd_load[TensorG[type].simd_width](i)
-                    + other.simd_load[TensorG[type].simd_width](i),
+                    self.simd_load[nelts](i) + other.simd_load[nelts](i),
                 )
             else:
-                result.simd_store[1](
+                result.simd_store[nelts](
                     i,
-                    self.simd_load[1](i) + other.simd_load[1](i),
+                    self.simd_strided_load[nelts](
+                        i, self.data.stride(self.data.rank() - 1)
+                    )
+                    + other.simd_strided_load[nelts](
+                        i, other.data.stride(other.data.rank() - 1)
+                    ),
                 )
+
+        vectorize[TensorG[type].simd_width, v_add](size)
 
         return result ^
 
