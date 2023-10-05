@@ -63,7 +63,7 @@ struct TensorBuffer[type: DType]:
         self.data = DTypePointer[type].alloc(0)
         self._dims = dims
         self._strides = StaticIntTuple[DIMS_SIZE](0)
-        self._rank = 1
+        self._rank = rank
         self.is_contiguous = True
 
         self.data = DTypePointer[type].alloc(self.num_elements())
@@ -71,7 +71,6 @@ struct TensorBuffer[type: DType]:
             rand(self.data, self.num_elements())
         else:
             self.zero()
-        self._rank = rank
         self._strides = self.__suffix_product()
         self.is_contiguous = self.__check_is_contiguous()
 
