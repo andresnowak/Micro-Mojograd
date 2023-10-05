@@ -65,7 +65,7 @@ struct TensorG[type: DType]:
                     self.simd_load[nelts](i) + other.simd_load[nelts](i),
                 )
             else:
-                # change the strided load to not use vectorize function, because we can have the last position in the tensor at the middle of the for loop and not at the end, depending on the order of strides
+                # TODO: change the strided load to not use vectorize function, because we can have the last position in the tensor at the middle of the for loop and not at the end, depending on the order of strides
                 result.simd_store[nelts](
                     i,
                     self.simd_strided_load[nelts](
