@@ -57,26 +57,32 @@ struct TensorG[type: DType]:
 
         let result = Self(self.shape(), self.data.rank(), False)  # is contiguous
 
-        @parameter
-        fn v_add[nelts: Int](i: Int):
-            if self.data.is_contiguous and other.data.is_contiguous:
-                result.simd_store[nelts](
-                    i,
-                    self.simd_load[nelts](i) + other.simd_load[nelts](i),
-                )
-            else:
-                # TODO: change the strided load to not use vectorize function, because we can have the last position in the tensor at the middle of the for loop and not at the end, depending on the order of strides
-                result.simd_store[nelts](
-                    i,
-                    self.simd_strided_load[nelts](
-                        i, self.data.stride(self.data.rank() - 1)
-                    )
-                    + other.simd_strided_load[nelts](
-                        i, other.data.stride(other.data.rank() - 1)
-                    ),
-                )
+        let inner_range = self.data.dim(self.data.rank() - 1)  # last dimension
+        let outer_range = size // inner_range
 
-        vectorize[TensorG[type].simd_width, v_add](size)
+        for i in range(outer_range):
+
+            @parameter
+            fn v_add[nelts: Int](j: Int):
+                let index = i * inner_range + j
+
+                if self.data.is_contiguous and other.data.is_contiguous:
+                    result.simd_store[nelts](
+                        index,
+                        self.simd_load[nelts](index) + other.simd_load[nelts](index),
+                    )
+                else:
+                    result.simd_store[nelts](
+                        index,
+                        self.simd_strided_load[nelts](
+                            index, self.data.stride(self.data.rank() - 1)
+                        )
+                        + other.simd_strided_load[nelts](
+                            index, other.data.stride(other.data.rank() - 1)
+                        ),
+                    )
+
+            vectorize[TensorG[type].simd_width, v_add](inner_range)
 
         return result ^
 
