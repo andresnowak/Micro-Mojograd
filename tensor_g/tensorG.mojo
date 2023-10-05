@@ -57,8 +57,6 @@ struct TensorG[type: DType]:
 
         let result = Self(self.shape(), self.data.rank(), False)  # is contiguous
 
-        print(self.data.is_contiguous, other.data.is_contiguous)
-
         @parameter
         fn v_add[nelts: Int](i: Int):
             if self.data.is_contiguous and other.data.is_contiguous:
@@ -67,6 +65,7 @@ struct TensorG[type: DType]:
                     self.simd_load[nelts](i) + other.simd_load[nelts](i),
                 )
             else:
+                # change the strided load to not use vectorize function, because we can have the last position in the tensor at the middle of the for loop and not at the end, depending on the order of strides
                 result.simd_store[nelts](
                     i,
                     self.simd_strided_load[nelts](

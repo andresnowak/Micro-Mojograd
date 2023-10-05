@@ -340,7 +340,7 @@ struct TensorBuffer[type: DType]:
 
     fn __check_is_contiguous(self) -> Bool:
         var c_contiguous = 1  # we save values in C row major order
-        for i in range(self._rank):
+        for i in range(self._rank - 1, -1, -1):
             if self._strides[i] != c_contiguous:
                 return False
             c_contiguous *= self._dims[i]
