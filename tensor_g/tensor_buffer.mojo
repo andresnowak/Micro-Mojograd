@@ -24,12 +24,12 @@ struct TensorBuffer[type: DType]:
         self._rank = 1
         self.is_contiguous = True
 
+        self._rank = len(VariadicList(dims))
         self.data = DTypePointer[type].alloc(self.num_elements())
         if random:
             rand(self.data, self.num_elements())
         else:
             self.zero()
-        self._rank = len(VariadicList(dims))
         self._strides = self.__suffix_product()
         self.is_contiguous = self.__check_is_contiguous()
 
@@ -44,12 +44,12 @@ struct TensorBuffer[type: DType]:
         self._rank = 1
         self.is_contiguous = True
 
+        self._rank = len(dims)
         self.data = DTypePointer[type].alloc(self.num_elements())
         if random:
             rand(self.data, self.num_elements())
         else:
             self.zero()
-        self._rank = len(dims)
         self._strides = self.__suffix_product()
         self.is_contiguous = self.__check_is_contiguous()
 
