@@ -93,6 +93,21 @@ struct TensorBuffer[type: DType]:
             self._dims[i] = 0
             self._strides[i] = 0
 
+    fn __init__(
+        inout self,
+        data: DTypePointer[type],
+        rank: Int,
+        dims: StaticIntTuple[DIMS_SIZE],
+        strides: StaticIntTuple[DIMS_SIZE],
+    ):
+        self.data = DTypePointer[type](data.address)
+        self._dims = dims
+        self._strides = strides
+        self._rank = rank
+        self.is_contiguous = True
+
+        self.is_contiguous = self.__check_is_contiguous()
+
     fn __copyinit__(inout self, existing: TensorBuffer[type]):
         self._dims = existing._dims
         self._strides = existing._strides
@@ -344,3 +359,39 @@ struct TensorBuffer[type: DType]:
                 return False
             c_contiguous *= self._dims[i]
         return True
+
+    fn transpose(self) -> Self:
+        """Transpose the tensor."""
+        # TODO: Change it to instead use the permutation function
+        var new_dims = StaticIntTuple[DIMS_SIZE](0)
+        var new_strides = StaticIntTuple[DIMS_SIZE](0)
+
+        for i in range(self._rank - 1, -1, -1):
+            new_dims[self._rank - 1 - i] = self._dims[i]
+            new_strides[self._rank - 1 - i] = self._strides[i]
+
+        return TensorBuffer[type](self.data, self.rank(), new_dims, new_strides)
+
+    fn permute(self, *dims_index: Int) -> Self:
+        """Permute the tensor."""
+
+        var new_dims = StaticIntTuple[DIMS_SIZE](0)
+        var new_strides = StaticIntTuple[DIMS_SIZE](0)
+
+        for i in range(self._rank):
+            new_dims[i] = self._dims[dims_index[i]]
+            new_strides[i] = self._strides[dims_index[i]]
+
+        return TensorBuffer[type](self.data, self.rank(), new_dims, new_strides)
+
+    fn permute(self, dims_index: VariadicList[Int]) -> Self:
+        """Permute the tensor."""
+
+        var new_dims = StaticIntTuple[DIMS_SIZE](0)
+        var new_strides = StaticIntTuple[DIMS_SIZE](0)
+
+        for i in range(self._rank):
+            new_dims[i] = self._dims[dims_index[i]]
+            new_strides[i] = self._strides[dims_index[i]]
+
+        return TensorBuffer[type](self.data, self.rank(), new_dims, new_strides)

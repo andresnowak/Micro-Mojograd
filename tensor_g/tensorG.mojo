@@ -21,6 +21,9 @@ struct TensorG[type: DType]:
     ):
         self.data = TensorBuffer[type](dims, rank, random)
 
+    fn __init__(inout self, buffer: TensorBuffer[type]):
+        self.data = buffer
+
     fn __copyinit__(inout self, existing: Self):
         self.data = existing.data
 
@@ -97,3 +100,21 @@ struct TensorG[type: DType]:
 
     fn rank(self) -> Int:
         return self.data.rank()
+
+    fn transpose(self) -> Self:
+        """Transpose the tensor."""
+        let new_buffer = self.data.transpose()
+
+        return Self(new_buffer)
+
+    fn permute(self, *dims_index: Int) -> Self:
+        """Permute the tensor."""
+        let new_buffer = self.data.permute(dims_index)
+
+        return Self(new_buffer)
+
+    fn permute(self, dims_index: VariadicList[Int]) -> Self:
+        """Permute the tensor."""
+        let new_buffer = self.data.permute(dims_index)
+
+        return Self(new_buffer)
