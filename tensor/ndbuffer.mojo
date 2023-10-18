@@ -1,3 +1,3 @@
-class NDBuffer:
-    def __init__(self):
+struct NDBuffer:
+    fn __init__(inout self):
         pass

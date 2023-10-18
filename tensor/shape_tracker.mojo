@@ -1,34 +1,34 @@
 alias dims_size = 12
 
 
-class ShapeTracker:
+struct ShapeTracker:
     var dims: StaticIntTuple[dims_size]
     var strides: StaticIntTuple[dims_size]
     var is_contiguous: Bool
 
-    def __init__(self):
+    fn __init__(inout self):
         pass
 
-    def __eq__(self, other):
+    fn __eq__(self, other: Self):
         pass
 
-    def matmul_eq(self, other):
+    fn matmul_eq(self, other: Self):
         pass
 
-    def __is_contiguous(self):
+    fn __is_contiguous(self):
         pass
 
-    def contiguous(self):
+    fn contiguous(self):
         pass
 
-    def reshape(self):
+    fn reshape(self):
         pass
 
-    def permute(self):
+    fn permute(self):
         pass
 
-    def view(self):
+    fn view(self):
         pass
 
-    def transpose(self):
+    fn transpose(self):
         pass
