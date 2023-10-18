@@ -118,3 +118,10 @@ struct ShapeTracker[dims_size: Int = 12]:
         let new_shape = ShapeTracker(self._rank, new_dims, new_strides)
 
         return new_shape
+
+    fn num_elements(self) -> Int:
+        var product = 1
+        for i in range(self._rank):
+            product *= self._dims[i]
+
+        return product
