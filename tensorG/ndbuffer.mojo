@@ -18,12 +18,20 @@ struct NDBuffer[type: DType]:
         self.data = DTypePointer[type].alloc(self.shape.num_elements())
         self.zero()
 
+    fn __copyinit__(inout self, existing: Self):
+        self.shape = existing.shape
+        self.data = existing.data
+    
+    fn __moveinit__(inout self, owned existing: Self):
+        self.shape = existing.shape
+        self.data = existing.data
+
     fn zero(self):
         """Set all the elements of the tensor to zero."""
         memset_zero(self.data, self.num_elements())
 
     fn print_all(self):
-        """Print The dimension of the tensor."""
+        """Print the values of the tensor."""
 
         let size = self.num_elements()
         let dims = self.shape.dims()
@@ -75,4 +83,13 @@ struct NDBuffer[type: DType]:
         - The buffer must be contiguous or width must be 1.
         """
         return self.data.simd_load[width](index)
+
+    fn simd_store[width: Int](self, index: Int, val: SIMD[type, width]):
+        """
+        Stores a value into the buffer at the specified index.
+
+        **Constraints**:
+        - The buffer must be contiguous or width must be 1.
+        """
+        self.data.simd_store[width](index, val)
     

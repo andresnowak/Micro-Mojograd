@@ -59,6 +59,7 @@ struct ShapeTracker[dims_size: Int = 12]:
             self._strides[i] = product
             product *= self._dims[i]
 
+    @always_inline
     fn __eq__(self, other: Self) -> Bool:
         if self._rank != other._rank:
             return False
@@ -67,6 +68,7 @@ struct ShapeTracker[dims_size: Int = 12]:
                 return False
         return True
 
+    @always_inline
     fn matmul_eq(self, other: Self):
         pass
 
