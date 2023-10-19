@@ -52,7 +52,7 @@ struct NDBuffer[type: DType]:
             suffix_product = 1
 
             @unroll
-            for j in range(self.shape.rank() - 1, -1, -1):
+            for j in range(self.shape._dims_size - 1, -1, -1):
                 if j < self.shape.rank():
                     suffix_product *= dims[j]
                     if i % suffix_product == 0 and i != size:
