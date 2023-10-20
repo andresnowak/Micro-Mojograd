@@ -34,7 +34,6 @@ struct NDBuffer[type: DType]:
         """Print the values of the tensor."""
 
         let size = self.num_elements()
-        let dims = self.shape.dims()
 
         var count = 0
         for i in range(size + 1):
@@ -44,7 +43,7 @@ struct NDBuffer[type: DType]:
             @unroll
             for j in range(self.shape._dims_size - 1, -1, -1):
                 if j < self.shape.rank():
-                    suffix_product *= dims[j]
+                    suffix_product *= self.shape._dims[j]
                     if i % suffix_product == 0 and i != 0:
                         print_no_newline("]")
                         count += 1
@@ -62,7 +61,7 @@ struct NDBuffer[type: DType]:
             @unroll
             for j in range(self.shape._dims_size - 1, -1, -1):
                 if j < self.shape.rank():
-                    suffix_product *= dims[j]
+                    suffix_product *= self.shape._dims[j]
                     if i % suffix_product == 0 and i != size:
                         print_no_newline("[")
 
@@ -75,6 +74,19 @@ struct NDBuffer[type: DType]:
         """Return the number of elements in the tensor."""
         return self.shape.num_elements()
 
+    @always_inline
+    fn __get_1d_position(self, index: VariadicList[Int]) -> Int:
+        """Get the 1D position from the list of indices."""
+        var position = 0
+
+        @unroll
+        for i in range(self.shape._dims_size):
+            if i < self.shape.rank():
+                position += index[i] * self.shape._strides[i]
+
+        return position
+
+    @always_inline
     fn simd_load[width: Int](self, index: Int) -> SIMD[type, width]:
         """
         Loads a value from the buffer at the specified index.
@@ -84,6 +96,7 @@ struct NDBuffer[type: DType]:
         """
         return self.data.simd_load[width](index)
 
+    @always_inline
     fn simd_store[width: Int](self, index: Int, val: SIMD[type, width]):
         """
         Stores a value into the buffer at the specified index.
