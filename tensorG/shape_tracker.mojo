@@ -78,11 +78,19 @@ struct ShapeTracker[dims_size: Int = 12]:
     fn rank(self) -> Int:
         return self._rank
 
-    fn dims(self) -> StaticIntTuple[dims_size]:
+    fn shape(self) -> StaticIntTuple[dims_size]:
         return self._dims
 
     fn strides(self) -> StaticIntTuple[dims_size]:
         return self._strides
+
+    fn dim(self, index: Int) -> Int:
+        """Get the dimension at the given index."""
+        return self._dims[index]
+
+    fn stride(self, index: Int) -> Int:
+        """Get the stride at the given index."""
+        return self._strides[index]
 
     fn __is_contiguous(inout self):
         var product = 1
